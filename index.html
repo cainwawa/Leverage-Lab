@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>增貸投資壓力測試模擬器 v2.11 - 邏輯修正版</title>
+    <title>增貸投資壓力測試模擬器 v2.12 - 作者標註版</title>
     
     <!-- 1. 載入 Tailwind CSS (樣式) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -38,7 +38,7 @@
         import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
         import { createRoot } from 'react-dom/client';
         import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart, Legend, BarChart, Bar, Cell, ReferenceDot, Label } from 'recharts';
-        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock } from 'lucide-react';
+        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink } from 'lucide-react';
 
         // --- 數學核心函式庫 ---
 
@@ -1004,9 +1004,9 @@
                     <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
                         <div className="p-2 bg-indigo-600 rounded-lg text-white shadow-md"> <Activity size={24} /> </div>
-                        增貸投資壓力測試模擬器 v2.11
+                        增貸投資壓力測試模擬器 v2.12
                     </h1>
-                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">邏輯修正版 (Logic Fixed)</span> </p>
+                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">不斷頭模型 (Non-Callable)</span> </p>
                     </div>
                 </div>
 
@@ -1552,6 +1552,19 @@
                         </div>
                     </div>
                     </div>
+                </div>
+                
+                <div className="mt-10 mb-6 text-center">
+                    <a 
+                        href="https://www.facebook.com/search/top?q=指數三寶飯" 
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[11px] text-slate-300 hover:text-slate-500 transition-colors select-none group"
+                    >
+                        <span>Designed by</span>
+                        <span className="font-bold underline decoration-slate-200 underline-offset-2 group-hover:decoration-slate-400">fb/指數三寶飯</span>
+                        <ExternalLink size={10} className="opacity-60 group-hover:opacity-100" />
+                    </a>
                 </div>
                 </div>
             );
