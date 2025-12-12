@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>增貸投資壓力測試模擬器 v2.17 - 風險註釋優化版</title>
+    <title>增貸投資壓力測試模擬器 v2.18 - 智能連動版</title>
     
     <!-- 1. 載入 Tailwind CSS (樣式) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -146,7 +146,11 @@
                 else amortizationPayment = (loan.amount * 10000) * (monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1);
             }
             const handleInterestOnlyToggle = (e) => {
-                onUpdate(loan.id, 'grace', e.target.checked ? loan.years : 0);
+                const isChecked = e.target.checked;
+                onUpdate(loan.id, 'grace', isChecked ? loan.years : 0);
+                if (isChecked) {
+                    onUpdate(loan.id, 'repayAtMaturity', true);
+                }
             };
             const handleMarginToggle = (e) => {
                 const isChecked = e.target.checked;
@@ -1064,9 +1068,9 @@
                     <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
                         <div className="p-2 bg-indigo-600 rounded-lg text-white shadow-md"> <Activity size={24} /> </div>
-                        增貸投資壓力測試模擬器 v2.17
+                        增貸投資壓力測試模擬器 v2.18
                     </h1>
-                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">不斷頭模型 (Non-Callable)</span> </p>
+                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">智能連動版 (Smart Linked)</span> </p>
                     </div>
                 </div>
 
@@ -1604,7 +1608,7 @@
                         <div>
                             <h4 className="text-sm font-bold text-amber-900 mb-2">模型限制與校正提醒 (Model Disclaimers)</h4>
                             <ul className="text-xs text-amber-800 space-y-1.5 list-disc list-inside opacity-90">
-                                <li><strong>v2.17 風險註釋優化 (Risk Clarification)</strong>：明確標示「到期全還」功能代表無法續約的情境，幫助投資人理解流動性風險的來源。</li>
+                                <li><strong>v2.18 智能連動 (Smart Linked)</strong>：勾選「只還息」將自動開啟「到期全還」，以真實模擬還款壓力。若您預期可順利轉貸，可手動取消該選項。</li>
                                 <li><strong>混合情境</strong>：支援同時模擬「房貸（不斷頭）」、「融資（會斷頭）」與「到期一次還本」的複雜債務組合。</li>
                                 <li><strong>流動性是唯一死穴 (Liquidity is King)</strong>：對於未啟用維持率限制的貸款（如房貸），唯一會導致破產的原因是「繳不出貸款」。請務必關注左側的「現金流警示」儀表板。</li>
                                 <li><strong>負資產心理壓力</strong>：雖然房貸模式允許淨值為負（水下），但現實中看著資產負債表赤字需要極強的心理素質，請勿忽視心理帳戶的影響。</li>
