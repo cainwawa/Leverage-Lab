@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>增貸投資壓力測試模擬器 v2.18 - 智能連動版</title>
+    <title>增貸投資壓力測試模擬器 v2.19 - 信貸接龍版</title>
     
     <!-- 1. 載入 Tailwind CSS (樣式) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -38,7 +38,7 @@
         import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
         import { createRoot } from 'react-dom/client';
         import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart, Legend, BarChart, Bar, Cell, ReferenceDot, Label } from 'recharts';
-        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink, CalendarClock } from 'lucide-react';
+        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink, CalendarClock, Hourglass } from 'lucide-react';
 
         // --- 數學核心函式庫 ---
 
@@ -77,26 +77,52 @@
         };
 
         const calculateLoanSchedule = (loan, totalMonths) => {
-            const { amount, years, rate, grace } = loan;
+            const { amount, years, rate, grace, startYear = 0 } = loan;
             const schedule = new Array(totalMonths).fill({ payment: 0, principal: 0, interest: 0, balance: 0 });
+            
             if (amount <= 0) return schedule;
+
+            const startMonthIdx = startYear * 12;
             const monthlyRate = rate / 100 / 12;
             const loanMonths = years * 12;
             const graceMonths = grace * 12;
+            
             let currentBalance = amount;
-            for (let t = 1; t <= totalMonths; t++) {
-                if (t > loanMonths) { schedule[t-1] = { payment: 0, principal: 0, interest: 0, balance: 0 }; continue; }
+            
+            // Loop through "loan life" months
+            for (let i = 1; i <= loanMonths; i++) {
+                const targetIdx = startMonthIdx + i - 1;
+                if (targetIdx >= totalMonths) break; // Exceeds simulation time
+
                 let payment = 0, interest = currentBalance * monthlyRate, principal = 0;
-                if (t <= graceMonths) { payment = interest; principal = 0; }
-                else {
+                
+                if (i <= graceMonths) { 
+                    payment = interest; 
+                    principal = 0; 
+                } else {
                     const n = loanMonths - graceMonths; 
-                    if (monthlyRate === 0) { principal = amount / n; payment = principal; interest = 0; }
-                    else { const pmt = amount * (monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1); payment = pmt; principal = payment - interest; }
+                    if (monthlyRate === 0) { 
+                        principal = amount / n; 
+                        payment = principal; 
+                        interest = 0; 
+                    } else { 
+                        const pmt = amount * (monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1); 
+                        payment = pmt; 
+                        principal = payment - interest; 
+                    }
                 }
-                if (currentBalance - principal < 1e-4) { principal = currentBalance; payment = principal + interest; currentBalance = 0; }
-                else { currentBalance -= principal; }
-                schedule[t-1] = { payment, principal, interest, balance: currentBalance };
+                
+                if (currentBalance - principal < 1e-4) { 
+                    principal = currentBalance; 
+                    payment = principal + interest; 
+                    currentBalance = 0; 
+                } else { 
+                    currentBalance -= principal; 
+                }
+                
+                schedule[targetIdx] = { payment, principal, interest, balance: currentBalance };
             }
+            
             return schedule;
         };
 
@@ -156,7 +182,6 @@
                 const isChecked = e.target.checked;
                 onUpdate(loan.id, 'enableMargin', isChecked);
                 if (isChecked) {
-                    // Logic Update: Enable Margin automatically enables Interest Only (Grace period = Loan years)
                     onUpdate(loan.id, 'grace', loan.years);
                     // Do not mutually exclude repayAtMaturity
                 }
@@ -174,7 +199,10 @@
             <div className={`bg-white p-4 rounded-xl border mb-3 shadow-sm relative overflow-hidden transition-all hover:shadow-md ${borderClass}`}>
                 <div className="flex justify-between items-start mb-3 border-b border-slate-50 pb-2">
                     <div>
-                        <span className="font-bold text-sm text-slate-700 block mb-1">{loan.name}</span>
+                        <span className="font-bold text-sm text-slate-700 block mb-1 flex items-center gap-2">
+                            {loan.name}
+                            {loan.startYear > 0 && <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 rounded-sm font-normal">T+{loan.startYear}</span>}
+                        </span>
                         <div className="flex flex-col gap-1">
                         {loan.amount > 0 ? (
                             isInterestOnly ? (
@@ -185,7 +213,7 @@
                                     {loan.repayAtMaturity && (
                                         <span className="text-[10px] bg-red-50 text-red-700 px-2 py-0.5 rounded-full font-mono font-medium flex items-center gap-1">
                                             <CalendarClock size={10} />
-                                            第{loan.years}年需還本: {loan.amount}萬
+                                            第{loan.years + loan.startYear}年需還本: {loan.amount}萬
                                         </span>
                                     )}
                                 </div>
@@ -220,6 +248,15 @@
                         <label className="text-[11px] font-bold text-slate-500 block mb-1">金額 (萬)</label>
                         <InputSlider value={loan.amount} setter={(v) => onUpdate(loan.id, 'amount', v)} min={0} max={5000} step={10} suffix="" enableInput={true}/>
                     </div>
+                    
+                    {/* Delayed Start Slider */}
+                    <div>
+                        <label className="text-[11px] font-bold text-slate-500 block mb-1 flex items-center gap-1">
+                            <Hourglass size={10} /> 幾年後開始投入 (延遲啟動)
+                        </label>
+                        <InputSlider value={loan.startYear || 0} setter={(v) => onUpdate(loan.id, 'startYear', v)} min={0} max={30} step={1} suffix="年" enableInput={true}/>
+                    </div>
+
                     <div>
                         <label className="text-[11px] font-bold text-slate-500 block mb-1">利率 (%)</label>
                         <InputSlider value={loan.rate} setter={(v) => onUpdate(loan.id, 'rate', v)} min={1.0} max={10.0} step={0.1} suffix="" enableInput={true}/>
@@ -397,9 +434,9 @@
             const [targetAmount, setTargetAmount] = useState(1000); 
 
             const [loans, setLoans] = useState([
-                { id: 1, name: "貸款 A", amount: 200, years: 30, rate: 2.2, grace: 5, active: true, maintenanceMargin: 130, enableMargin: false, repayAtMaturity: false },
-                { id: 2, name: "貸款 B", amount: 0, years: 7, rate: 3.5, grace: 0, active: true, maintenanceMargin: 130, enableMargin: false, repayAtMaturity: false },
-                { id: 3, name: "貸款 C", amount: 0, years: 20, rate: 2.5, grace: 0, active: true, maintenanceMargin: 130, enableMargin: false, repayAtMaturity: false },
+                { id: 1, name: "貸款 A", amount: 200, years: 30, rate: 2.2, grace: 5, active: true, maintenanceMargin: 130, enableMargin: false, repayAtMaturity: false, startYear: 0 },
+                { id: 2, name: "貸款 B", amount: 0, years: 7, rate: 3.5, grace: 0, active: true, maintenanceMargin: 130, enableMargin: false, repayAtMaturity: false, startYear: 0 },
+                { id: 3, name: "貸款 C", amount: 0, years: 20, rate: 2.5, grace: 0, active: true, maintenanceMargin: 130, enableMargin: false, repayAtMaturity: false, startYear: 0 },
             ]);
 
             const [stressTestActive, setStressTestActive] = useState(false);
@@ -621,11 +658,29 @@
 
                         loans.forEach(loan => {
                             if (loan.amount > 0 && loan.grace >= loan.years && loan.repayAtMaturity) {
-                                const maturityStep = loan.years * 12;
+                                // Logic update for delay start: maturity is at (startYear + years) * 12
+                                const startMonth = loan.startYear * 12;
+                                const maturityStep = startMonth + loan.years * 12;
                                 if (maturityStep <= totalSteps) {
                                     repaymentSchedule[maturityStep] += loan.amount;
                                     if(loan.enableMargin) {
-                                        marginRepaymentSchedule[maturityStep] += loan.amount; // Add to margin repayment track
+                                        marginRepaymentSchedule[maturityStep] += loan.amount; 
+                                    }
+                                }
+                            }
+                        });
+                        
+                        // New Logic: Loan Injection Schedule
+                        const injectionSchedule = new Float32Array(totalSteps + 1).fill(0);
+                        const marginInjectionSchedule = new Float32Array(totalSteps + 1).fill(0);
+                        
+                        loans.forEach(loan => {
+                            if (loan.amount > 0) {
+                                const startMonth = loan.startYear * 12;
+                                if (startMonth <= totalSteps) {
+                                    injectionSchedule[startMonth] += loan.amount;
+                                    if(loan.enableMargin) {
+                                        marginInjectionSchedule[startMonth] += loan.amount;
                                     }
                                 }
                             }
@@ -663,17 +718,14 @@
                         }
                         const finalTotalInvested = cumulativePrincipalLine[totalSteps];
                         
+                        // Weighted Rate Calculation - Needs to be time-weighted or simplified?
+                        // Simplified: Average of all loans regardless of start time
                         let totalLoanAmt = 0;
                         let weightedRateSum = 0;
-                        let initialMarginDebtTotal = 0; 
-
                         loans.forEach(l => {
                             if (l.amount > 0) {
                                 totalLoanAmt += l.amount;
                                 weightedRateSum += l.amount * l.rate;
-                                if (l.enableMargin) {
-                                    initialMarginDebtTotal += l.amount; 
-                                }
                             }
                         });
                         const avgLoanRate = totalLoanAmt > 0 ? weightedRateSum / totalLoanAmt : 0;
@@ -691,9 +743,10 @@
                             const pathBaseNW = new Float32Array(totalSteps + 1);
                             const pathBaseGA = new Float32Array(totalSteps + 1);
 
-                            let currentGrossAsset = Number(initialCapital) + totalLoanAmt; 
-                            let currentTotalLoanBalance = totalLoanAmt;
-                            let currentMarginDebt = initialMarginDebtTotal; // Track margin debt dynamically per universe           
+                            // Initial State: Only initial capital + loans starting at 0
+                            let currentGrossAsset = Number(initialCapital) + injectionSchedule[0]; 
+                            let currentTotalLoanBalance = injectionSchedule[0];
+                            let currentMarginDebt = marginInjectionSchedule[0];          
                             let currentBaseAsset = Number(initialCapital);                  
 
                             pathLevNW[0] = currentGrossAsset - currentTotalLoanBalance;
@@ -731,16 +784,28 @@
                                     
                                     currentGrossAsset += marketGrowthLev;
                                     currentGrossAsset += (currentMonthlyInjection - schedule.totalPayment);
+                                    
+                                    // Handle Delayed Injections at START of step t+1 (effectively now for t+1 state)
+                                    // Actually, schedule[t] is payment for month t.
+                                    // Injection should happen? Let's assume injection happens at month boundary.
+                                    // If injectionSchedule[t+1] has value, it means at start of month t+1 we add funds.
+                                    if (t + 1 < injectionSchedule.length && injectionSchedule[t+1] > 0) {
+                                        const amount = injectionSchedule[t+1];
+                                        currentGrossAsset += amount;
+                                        currentTotalLoanBalance += amount;
+                                        if (marginInjectionSchedule[t+1] > 0) {
+                                            currentMarginDebt += marginInjectionSchedule[t+1];
+                                        }
+                                    }
+
                                     currentTotalLoanBalance -= schedule.totalPrincipalRed;
                                     
-                                    // Handle Repayment at Maturity (Balloon Payment)
-                                    // Also reduce currentMarginDebt if the repaid loan was a margin loan
+                                    // Handle Repayment at Maturity
                                     if (repaymentSchedule[t+1] > 0) {
                                         const repaymentAmount = repaymentSchedule[t+1];
                                         currentGrossAsset -= repaymentAmount;
                                         currentTotalLoanBalance -= repaymentAmount;
                                         
-                                        // Reduce margin debt balance if applicable
                                         if (marginRepaymentSchedule[t+1] > 0) {
                                             currentMarginDebt -= marginRepaymentSchedule[t+1];
                                         }
@@ -750,18 +815,22 @@
                                     accumulatedInterest += interestPaid;
                                     const netWorth = currentGrossAsset - currentTotalLoanBalance;
                                     
-                                    // 1. Absolute Ruin (Assets gone)
+                                    // 1. Absolute Ruin
                                     if (currentGrossAsset <= 0.01) {
                                         hasGoneBust = true;
                                         bustYear = (t+1)/12; 
                                         currentGrossAsset = 0; 
                                     }
 
-                                    // 2. Margin Call Logic (Using dynamic currentMarginDebt)
+                                    // 2. Margin Call Logic
                                     if (!hasGoneBust && currentMarginDebt > 0) {
                                         const currentRatio = (currentGrossAsset / currentMarginDebt) * 100;
                                         for (const loan of loans) {
-                                            if (loan.amount > 0 && loan.enableMargin && currentRatio < loan.maintenanceMargin) {
+                                            // Check if active margin loan
+                                            const loanStartMonth = (loan.startYear || 0) * 12;
+                                            const isLoanActive = (t + 1) > loanStartMonth; 
+                                            
+                                            if (loan.amount > 0 && loan.enableMargin && isLoanActive && currentRatio < loan.maintenanceMargin) {
                                                 hasGoneBust = true;
                                                 currentGrossAsset = 0; 
                                                 break;
@@ -1068,9 +1137,9 @@
                     <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
                         <div className="p-2 bg-indigo-600 rounded-lg text-white shadow-md"> <Activity size={24} /> </div>
-                        增貸投資壓力測試模擬器 v2.18
+                        增貸投資壓力測試模擬器 v2.19
                     </h1>
-                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">智能連動版 (Smart Linked)</span> </p>
+                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">信貸接龍版 (Loan Laddering)</span> </p>
                     </div>
                 </div>
 
@@ -1608,6 +1677,7 @@
                         <div>
                             <h4 className="text-sm font-bold text-amber-900 mb-2">模型限制與校正提醒 (Model Disclaimers)</h4>
                             <ul className="text-xs text-amber-800 space-y-1.5 list-disc list-inside opacity-90">
+                                <li><strong>v2.19 信貸接龍 (Loan Laddering)</strong>：新增「延遲投入」功能。您可以設定不同貸款在不同年份啟動，模擬隨時間加碼或信貸接龍的策略。注意：延遲投入的資金在啟動前不會計入資產或負債。</li>
                                 <li><strong>v2.18 智能連動 (Smart Linked)</strong>：勾選「只還息」將自動開啟「到期全還」，以真實模擬還款壓力。若您預期可順利轉貸，可手動取消該選項。</li>
                                 <li><strong>混合情境</strong>：支援同時模擬「房貸（不斷頭）」、「融資（會斷頭）」與「到期一次還本」的複雜債務組合。</li>
                                 <li><strong>流動性是唯一死穴 (Liquidity is King)</strong>：對於未啟用維持率限制的貸款（如房貸），唯一會導致破產的原因是「繳不出貸款」。請務必關注左側的「現金流警示」儀表板。</li>
