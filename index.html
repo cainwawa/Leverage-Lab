@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>增貸投資壓力測試模擬器 v2.38 - P50 錨定版</title>
+    <title>增貸投資壓力測試模擬器 v2.47 - 符號統一版</title>
     
     <!-- 1. 載入 Tailwind CSS (樣式) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -53,7 +53,7 @@
         import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
         import { createRoot } from 'react-dom/client';
         import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart, Legend, BarChart, Bar, Cell, ReferenceDot, Label } from 'recharts';
-        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink, CalendarClock, Hourglass, ArrowLeftRight, CheckCircle2, Wallet2, Maximize2, ChevronDown, ChevronUp, History } from 'lucide-react';
+        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink, CalendarClock, Hourglass, ArrowLeftRight, CheckCircle2, Wallet2, Maximize2, ChevronDown, ChevronUp, History, Bird, Banknote } from 'lucide-react';
 
         // --- 數學核心函式庫 ---
 
@@ -146,7 +146,8 @@
                         payment = principal; 
                         interest = 0; 
                     } else { 
-                        const pmt = amount * (monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n)) - 1; 
+                        // FIX v2.43: PMT Formula Correction
+                        const pmt = amount * (monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1); 
                         payment = pmt; 
                         principal = payment - interest; 
                     }
@@ -234,7 +235,6 @@
 
             const canRefinance = (loan.id === 2 && canRefinanceA) || (loan.id === 3 && canRefinancePrev);
 
-            // Dynamic Label Generation with Balances
             const getRefinanceLabel = () => {
                 const currentStartMonth = loan.startYear * 12;
                 
@@ -258,16 +258,13 @@
                 return "";
             };
 
-            // Calculate estimated deficiency for UI warning (Synchronized)
             const getDeficiencyWarning = () => {
                 if (!loan.refinancePrevious) return null;
                 const currentStartMonth = loan.startYear * 12;
                 let estimatedPrevDebt = 0;
                 let availablePool = loan.amount;
 
-                // Logic for Loan B
                 if (loan.id === 2 && canRefinanceA) {
-                    // Check if C is joining (B & C same start year, C refinancing previous)
                     const isCJoining = allLoans[2].startYear === loan.startYear && allLoans[2].refinancePrevious;
                     if (isCJoining) {
                         availablePool += allLoans[2].amount;
@@ -275,16 +272,12 @@
                     estimatedPrevDebt += getEstimatedBalance(allLoans[0], currentStartMonth);
                 }
 
-                // Logic for Loan C
                 if (loan.id === 3) {
-                     // If Joint Payment (C==B)
                      if (loan.startYear === allLoans[1].startYear) {
                          const debtA = getEstimatedBalance(allLoans[0], currentStartMonth);
                          estimatedPrevDebt = debtA;
-                         // Add B's amount to pool
                          availablePool += allLoans[1].amount;
                      } 
-                     // If Sequential (C > B)
                      else if (allLoans[1].refinancePrevious) {
                          estimatedPrevDebt += getEstimatedBalance(allLoans[1], currentStartMonth);
                      } else {
@@ -451,6 +444,43 @@
         const CustomTooltip = ({ active, payload, label }) => {
             if (active && payload && payload.length) {
                 const isSurvivalMode = payload.some(p => p.name === 'survivalLev');
+                const isCashFlowMode = payload.some(p => p.name === 'monthlyInjection'); 
+
+                if (isCashFlowMode) {
+                    return (
+                        <div className="bg-white p-3 border border-slate-100 shadow-xl rounded-xl text-xs z-50">
+                            <p className="font-bold text-slate-700 mb-2 border-b border-slate-100 pb-1">第 {label} 年 (月現金流)</p>
+                            <div className="space-y-1">
+                                {payload.map((entry, index) => {
+                                    let displayName = entry.name;
+                                    let valueColor = entry.color;
+                                    let value = entry.value;
+
+                                    if (entry.name === 'monthlyInjection') { displayName = '每月投入 (儲蓄)'; valueColor = '#3b82f6'; }
+                                    else if (entry.name === 'monthlyPayment') { displayName = '每月還款 (本息)'; valueColor = '#ef4444'; }
+                                    else if (entry.name === 'netCashFlow') { 
+                                        displayName = '淨現金流'; 
+                                        valueColor = value >= 0 ? '#22c55e' : '#f97316'; 
+                                    }
+
+                                    return (
+                                        <div key={index} className="flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: valueColor }}></span>
+                                                <span className="font-medium text-slate-600">{displayName}</span>
+                                            </div>
+                                            <span className="font-mono font-bold" style={{ color: valueColor }}>
+                                                {/* FIX v2.47: Consistent signs for all flows */}
+                                                {(entry.name === 'monthlyInjection' || (entry.name === 'netCashFlow' && value > 0)) ? '+' : ''}
+                                                {Math.round(value).toLocaleString()}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                }
 
                 return (
                     <div className="bg-white p-3 border border-slate-100 shadow-xl rounded-xl text-xs z-50">
@@ -563,6 +593,15 @@
         };
 
         const versionHistory = [
+            { ver: "v2.47", title: "符號統一 (Sign Consistency)", desc: "現金流 Tooltip 全面符號化，儲蓄投入顯示為+號(藍)，還款顯示為-號(紅)，淨流為+/-號(綠/橘)，提升閱讀直覺性。" },
+            { ver: "v2.46", title: "標記修復 (Tooltip Fix)", desc: "修復現金流 Tooltip 中淨現金流正負號顯示錯誤的問題。" },
+            { ver: "v2.45", title: "現金流視覺優化 (Visual Tweak)", desc: "現金流圖表優化：移除轉貸當下的本金進出顯示，專注於呈現每月的常態性現金流細節。" },
+            { ver: "v2.44", title: "完整修復 (Full Restoration)", desc: "修復了 v2.43 中因代碼整理而遺失的現金流邏輯與說明文字，並將現金流圖表優化為清晰的三線視圖（紅藍綠），此版本功能完整。" },
+            { ver: "v2.43", title: "運算修正 (Hotfix)", desc: "修復寬限期後本金攤還計算錯誤 (PMT公式修正)，還原真實還款壓力曲線。" },
+            { ver: "v2.42", title: "現金流修復 (Logic Fix)", desc: "修正借新還舊時的現金流重複計算問題，並將現金流圖表優化為紅(貸款)/藍(儲蓄)/綠(淨流)三線顯示。" },
+            { ver: "v2.41", title: "現金流透視 (Cash Flow Chart)", desc: "新增「現金流」圖表，可視化每月的投入與還款變化。並追加「過高槓桿」與「波動率拖累」的風險警示。" },
+            { ver: "v2.40", title: "評論邏輯精修 (Logic Refined)", desc: "優化潛水(P10 < 80%本金)與雞肋策略(Spread < Base*5%)的判定門檻，使其更符合真實心理感受。" },
+            { ver: "v2.39", title: "評論邏輯優化 (Logic Refined)", desc: "嚴格化風險判定：破產機率>0.1%即為高風險，P10本金虧損>20%視為潛水，並新增「雞肋策略」偵測。" },
             { ver: "v2.38", title: "P50 錨定 (P50 Anchor)", desc: "於勝率下方顯示「有貸款策略的 P50 終值」，提供更具體的期望收益參考。" },
             { ver: "v2.37", title: "完整修復 (Full Restoration)", desc: "修復了 v2.36 中因代碼整理而遺失的現金流、圖表與稽核表等核心功能。" },
             { ver: "v2.36", title: "說明優化 (Docs Refined)", desc: "更新模型限制說明，補完流動性風險、心理壓力與混合債務情境的詳細警示。" },
@@ -608,6 +647,8 @@
 
             const [stressTestActive, setStressTestActive] = useState(false);
             const [backupState, setBackupState] = useState(null);
+
+            const [chartDataCashFlow, setChartDataCashFlow] = useState([]); // New state for Cash Flow Chart
 
             const triggerStressTest = () => {
                 // Snapshot current state
@@ -752,11 +793,17 @@
                 if (ruinProbLev > 0) riskFactors.push({ label: "存在破產風險", val: `${ruinProbLev.toFixed(1)}%`, isBad: true });
                 if (ruinProbLev > 5) riskFactors.push({ label: "生存率極低", val: "Critical", isBad: true });
 
-                const isP10Survived = levROI.p10NetWorth > 0;
-                const isP10Healthy = levROI.p10NetWorth > (totalInvested * 0.5); 
+                const initialLeverage = (initialCapital + totalLoanAmount) / initialCapital;
+
+                if (initialLeverage > 3.0) riskFactors.push({ label: "過度槓桿", val: `${initialLeverage.toFixed(1)}x`, isBad: true });
+                if (volatility > 25 && initialLeverage > 1.2) riskFactors.push({ label: "波動率拖累", val: "High", isBad: true });
+
+                const isP10Healthy = levROI.p10NetWorth > (totalInvested * 0.8); 
                 const isWinRateGood = leverageAdvantage >= 60;
+                
+                const threshold = Math.abs(baseROI.irrP50) * 0.05;
                 const yieldSpread = levROI.irrP50 - baseROI.irrP50;
-                const isSpreadAttractive = yieldSpread >= 2.0;
+                const isSpreadAttractive = yieldSpread >= threshold;
 
                 let title, colorClass, bgClass, icon, desc;
 
@@ -766,7 +813,7 @@
                      bgClass = "bg-slate-200 border-slate-300 from-slate-100 to-white";
                      icon = Skull;
                      desc = `即使在房貸型融資下，此策略仍有超過一半的機率導致投資部位全數歸零 (${ruinProbLev.toFixed(1)}%)，這表示槓桿過高或現金流完全枯竭。`;
-                } else if (ruinProbLev > 1) {
+                } else if (ruinProbLev > 0.1) { 
                     title = "高風險策略 (High Risk)";
                     colorClass = "text-red-700";
                     bgClass = "bg-red-50 border-red-200 from-red-50 to-white";
@@ -783,19 +830,19 @@
                     colorClass = "text-orange-700";
                     bgClass = "bg-orange-50 border-orange-200 from-orange-50 to-white";
                     icon = Anchor;
-                    desc = "在悲觀情境 (P10) 下，您的資產將長期處於「負資產」狀態（市值 < 房貸餘額）。雖然不會被斷頭，但需要極強的心理素質撐過漫長的水下期。";
-                } else if (isWinRateGood && isSpreadAttractive) {
-                    title = "聖杯區 (The Sweet Spot)";
-                    colorClass = "text-emerald-700";
-                    bgClass = "bg-emerald-50 border-emerald-200 from-emerald-50 to-white";
-                    icon = Zap;
-                    desc = "完美！這是一個高韌性的房貸投資策略。生存率極高 (0% 歸零)，且在長期時間下能有效利用低息資金創造超額報酬。";
+                    desc = "在悲觀情境 (P10) 下，您的資產將縮水並低於本金的 80%。雖然房貸模式允許淨值為負，但您需評估是否能承受長時間的賬面虧損心理壓力。";
+                } else if (!isSpreadAttractive) { 
+                    title = "雞肋策略 (Marginal Gain)";
+                    colorClass = "text-stone-700";
+                    bgClass = "bg-stone-100 border-stone-200 from-stone-50 to-white";
+                    icon = Bird; 
+                    desc = `雖然勝率尚可，但槓桿帶來的額外年化報酬 (IRR Spread) 不足無貸款報酬的 5%。考量到借貸的繁瑣與心理壓力，此策略可能「吃力不討好」。`;
                 } else {
                     title = "穩健策略 (Solid)";
                     colorClass = "text-indigo-700";
                     bgClass = "bg-indigo-50 border-indigo-200 from-indigo-50 to-white";
                     icon = ThumbsUp;
-                    desc = "策略體質健康。利用房貸的「不斷頭」特性，長期持有勝算很高。";
+                    desc = "策略體質健康。利用房貸的「不斷頭」特性，長期持有勝算很高，且下檔風險在可控範圍內。";
                 }
 
                 return { title, colorClass, bgClass, icon, desc, factors: riskFactors };
@@ -828,14 +875,63 @@
                         const targetAmt = Number(targetAmount);
 
                         const loanSchedules = loans.map(loan => calculateLoanSchedule(loan, totalSteps));
+                        
+                        // 1. Prepare Loan Events
+                        const loanEvents = loans
+                            .filter(l => l.amount > 0)
+                            .map(l => ({ ...l, startMonth: l.startYear * 12 }))
+                            .sort((a, b) => a.startMonth - b.startMonth);
+
+                        const loanState = loans.map(l => ({ 
+                            id: l.id, 
+                            isPaidOff: false, 
+                            paidOffMonth: null 
+                        }));
+
+                        // 2. Process Refinancing and Truncate Schedules
+                        const loanCutoffs = {}; // { loanId: monthIndex }
+
+                        loanEvents.forEach(loan => {
+                            const t = loan.startMonth;
+                            if (loan.refinancePrevious) {
+                                let targets = [];
+                                if (loan.id === 2) { 
+                                     if (loans[0].amount > 0 && loans[0].startYear < loan.startYear) targets.push(loans[0]);
+                                }
+                                if (loan.id === 3) { 
+                                     if (loans[0].amount > 0 && loans[0].startYear < loan.startYear) targets.push(loans[0]);
+                                     if (loans[1].amount > 0 && loans[1].startYear < loan.startYear) targets.push(loans[1]);
+                                }
+
+                                targets.forEach(target => {
+                                    if (!loanCutoffs[target.id]) {
+                                        loanCutoffs[target.id] = t;
+                                    }
+                                });
+                            }
+                        });
+
+                        const finalLoanSchedules = loanSchedules.map((schedule, idx) => {
+                            const loanId = loans[idx].id;
+                            const cutoff = loanCutoffs[loanId];
+                            if (cutoff !== undefined) {
+                                return schedule.map((item, i) => {
+                                    if (i >= cutoff) return { payment: 0, principal: 0, interest: 0, balance: 0 };
+                                    return item;
+                                });
+                            }
+                            return schedule;
+                        });
+
+                        // 3. Aggregate Schedules
                         const aggregateSchedule = new Array(totalSteps).fill(null).map((_, t) => {
                             let totalPayment = 0, totalPrincipalRed = 0;
-                            loans.forEach((loan, idx) => {
-                            const stepInfo = loanSchedules[idx][t]; 
-                            if (stepInfo) {
-                                totalPayment += stepInfo.payment;
-                                totalPrincipalRed += stepInfo.principal;
-                            }
+                            finalLoanSchedules.forEach((schedule) => {
+                                const stepInfo = schedule[t]; 
+                                if (stepInfo) {
+                                    totalPayment += stepInfo.payment;
+                                    totalPrincipalRed += stepInfo.principal;
+                                }
                             });
                             return { totalPayment, totalPrincipalRed };
                         });
@@ -846,26 +942,10 @@
 
                         loans.forEach(loan => {
                             if (loan.amount > 0 && loan.grace >= loan.years && loan.repayAtMaturity) {
-                                // FIX: Updated logic to check if refinanced
-                                // If loan is refinanced at a time T <= maturity time, then balloon payment is cancelled.
-                                let isRefinanced = false;
-                                const maturityTime = loan.startYear + loan.years;
+                                const cutoff = loanCutoffs[loan.id];
+                                const maturityStep = (loan.startYear + loan.years) * 12;
                                 
-                                if (loan.id === 1) { // Loan A
-                                    // Refinanced by B or C?
-                                    if ((loans[1].refinancePrevious && loans[1].startYear <= maturityTime) || 
-                                        (loans[2].refinancePrevious && loans[2].startYear <= maturityTime)) {
-                                        isRefinanced = true;
-                                    }
-                                } else if (loan.id === 2) { // Loan B
-                                    // Refinanced by C?
-                                    if (loans[2].refinancePrevious && loans[2].startYear <= maturityTime) {
-                                        isRefinanced = true;
-                                    }
-                                }
-
-                                if (!isRefinanced) {
-                                    const maturityStep = (loan.startYear + loan.years) * 12;
+                                if (cutoff === undefined || cutoff >= maturityStep) {
                                     if (maturityStep <= totalSteps) {
                                         repaymentSchedule[maturityStep] += loan.amount;
                                         if(loan.enableMargin) {
@@ -879,21 +959,10 @@
                         // New Logic: Loan Injection Schedule & Payoff Schedule
                         const injectionSchedule = new Float32Array(totalSteps + 1).fill(0);
                         const marginInjectionSchedule = new Float32Array(totalSteps + 1).fill(0);
-                        const payoffSchedule = new Float32Array(totalSteps + 1).fill(0); // For refinancing deductions
-                        const marginPayoffSchedule = new Float32Array(totalSteps + 1).fill(0); // Track margin reduction from refinance
+                        const payoffSchedule = new Float32Array(totalSteps + 1).fill(0); 
+                        const marginPayoffSchedule = new Float32Array(totalSteps + 1).fill(0); 
 
                         // Iterate through time to determine what happens
-                        const loanEvents = loans
-                            .filter(l => l.amount > 0)
-                            .map(l => ({ ...l, startMonth: l.startYear * 12 }))
-                            .sort((a, b) => a.startMonth - b.startMonth);
-
-                        const loanState = loans.map(l => ({ 
-                            id: l.id, 
-                            isPaidOff: false, 
-                            paidOffMonth: null 
-                        }));
-                        
                         loanEvents.forEach(loan => {
                             const t = loan.startMonth;
                             if (t > totalSteps) return;
@@ -904,52 +973,39 @@
 
                             // 2. Check Refinance Logic
                             if (loan.refinancePrevious) {
-                                // Logic update for C==B joint payment case
-                                if (loan.id === 3 && loan.startYear === loans[1].startYear && loans[1].refinancePrevious) {
-                                    // Joint payment logic handled implicitly by B's refinance action?
-                                    // NO. B refinances A. C just injects.
-                                    // If B+C needed to cover A, B's logic below would fail to cover full amount if we only check B's amount vs A's debt.
-                                    // But here we are calculating schedules.
-                                    // The payoffSchedule just records money LEAVING to pay debt.
-                                    // If B triggers payoff of A, A is paid off.
-                                    // C injecting money just adds to GrossAsset.
-                                    // The net effect (B_in + C_in - A_out) is calculated in the loop.
-                                    // So we don't need special "joint payoff" logic here for scheduling,
-                                    // just ensure A is marked paid off.
-                                } else {
-                                    const targets = loans.filter(l => l.id < loan.id && l.amount > 0 && l.startYear < loan.startYear);
-                                    
-                                    targets.forEach(target => {
-                                        const targetState = loanState.find(s => s.id === target.id);
-                                        if (!targetState.isPaidOff) {
-                                            const balance = getEstimatedBalance(target, t);
-                                            if (balance > 0) {
-                                                payoffSchedule[t] += balance;
-                                                if (target.enableMargin) marginPayoffSchedule[t] += balance;
-                                                
-                                                targetState.isPaidOff = true;
-                                                targetState.paidOffMonth = t;
-                                            }
-                                        }
-                                    });
-                                }
+                                const targets = loans.filter(l => l.id < loan.id && l.amount > 0 && l.startYear < loan.startYear);
+                                targets.forEach(target => {
+                                    if (loanCutoffs[target.id] === t) {
+                                         const balance = getEstimatedBalance(target, t);
+                                         if (balance > 0) {
+                                            payoffSchedule[t] += balance;
+                                            if (target.enableMargin) marginPayoffSchedule[t] += balance;
+                                         }
+                                    }
+                                });
                             }
+                        });
+                        
+                        // 4. Calculate Cash Flow Series for Charting (v2.45 Modified)
+                        const cashFlowSeries = new Array(totalSteps).fill(null).map((_, t) => {
+                            const currentMonthlyInjection = monthlySavingsNum * Math.pow(1 + savingsGrowthRateNum / 100, t / 12);
+                            const totalPayment = aggregateSchedule[t].totalPayment;
+
+                            // User requested to REMOVE principal flow from this chart to see monthly details
+                            // const capitalFlow = netCapitalFlowSchedule[t];
+                            // const net = currentMonthlyInjection - totalPayment + capitalFlow;
+
+                            const net = currentMonthlyInjection - totalPayment; // Pure monthly flow
+
+                            return {
+                                month: t,
+                                year: (t/12).toFixed(1),
+                                monthlyInjection: currentMonthlyInjection,
+                                monthlyPayment: -totalPayment,
+                                netCashFlow: net
+                            };
                         });
 
-                        // 3. Balloon Payments (Maturity)
-                        loans.forEach(loan => {
-                            if (loan.amount > 0 && loan.grace >= loan.years && loan.repayAtMaturity) {
-                                const maturityStep = (loan.startYear + loan.years) * 12;
-                                if (maturityStep <= totalSteps) {
-                                    const state = loanState.find(s => s.id === loan.id);
-                                    if (!state.isPaidOff) {
-                                        repaymentSchedule[maturityStep] += loan.amount;
-                                        if (loan.enableMargin) marginRepaymentSchedule[maturityStep] += loan.amount;
-                                        state.isPaidOff = true; 
-                                    }
-                                }
-                            }
-                        });
 
                         initialDeficitValue = Math.max(0, aggregateSchedule[0].totalPayment - monthlySavingsNum);
 
@@ -1012,7 +1068,6 @@
                             const pathBaseGA = new Float32Array(totalSteps + 1);
 
                             // Initial State
-                            // Apply Month 0 events immediately
                             let currentGrossAsset = Number(initialCapital) + injectionSchedule[0] - payoffSchedule[0]; 
                             let currentTotalLoanBalance = injectionSchedule[0] - payoffSchedule[0];
                             let currentMarginDebt = marginInjectionSchedule[0] - marginPayoffSchedule[0];          
@@ -1098,8 +1153,7 @@
                                         for (const loan of loans) {
                                             const loanStartMonth = (loan.startYear || 0) * 12;
                                             const isLoanActive = (t + 1) > loanStartMonth; 
-                                            // Fix: Also check if loan is NOT paid off by refinance?
-                                            // Simplification: We check if `t+1` is < paidOffMonth.
+                                            // Simplification: We check if `t+1` is < paidOffMonth (if paid off).
                                             const lState = loanState.find(s => s.id === loan.id);
                                             // If paidOffMonth is null, it's never paid off (or active until end). 
                                             // If it has value, check time.
@@ -1164,14 +1218,17 @@
                         }
 
                         return {
-                            allUniverses, finalTotalInvested, cumulativePrincipalLine, totalSteps, avgLoanRate, isIdentical, survivalCountsLev, survivalCountsBase, cashFlowData: { hasNegativeFlow: hasNegFlow, firstNegativeYear: firstNegYear, initialMonthlyDeficit: initialDeficitValue, maxMonthlyDeficit: maxDeficit, maxDeficitYear: maxDeficitYear, durationYears: (negMonthCount / 12).toFixed(1), paymentAtMaxDeficit, savingsAtMaxDeficit }
+                            allUniverses, finalTotalInvested, cumulativePrincipalLine, totalSteps, avgLoanRate, isIdentical, survivalCountsLev, survivalCountsBase, 
+                            cashFlowData: { hasNegativeFlow: hasNegFlow, firstNegativeYear: firstNegYear, initialMonthlyDeficit: initialDeficitValue, maxMonthlyDeficit: maxDeficit, maxDeficitYear: maxDeficitYear, durationYears: (negMonthCount / 12).toFixed(1), paymentAtMaxDeficit, savingsAtMaxDeficit },
+                            cashFlowSeries // New Series for Chart
                         };
                     }; 
 
                     const result = runSimulationEngine();
-                    const { allUniverses, finalTotalInvested, cumulativePrincipalLine, totalSteps, avgLoanRate, isIdentical, cashFlowData, survivalCountsLev, survivalCountsBase } = result;
+                    const { allUniverses, finalTotalInvested, cumulativePrincipalLine, totalSteps, avgLoanRate, isIdentical, cashFlowData, cashFlowSeries, survivalCountsLev, survivalCountsBase } = result;
 
                     setCashFlowStatus(cashFlowData);
+                    setChartDataCashFlow(cashFlowSeries); // Update State
                     setSimResults(allUniverses);
 
                     const sortedLevROIs = [...allUniverses].map(r => r.levROI).sort((a, b) => a - b);
@@ -1376,6 +1433,8 @@
 
             const displayData = useMemo(() => {
                 if (isSimulating) return [];
+                if (viewMode === 'cashFlow') return chartDataCashFlow; 
+
                 let baseData;
                 if (viewMode === 'survival') baseData = chartDataSurvival;
                 else if (viewMode === 'netWorth') baseData = chartDataNW;
@@ -1408,7 +1467,7 @@
                     }
                 }
                 return baseData;
-            }, [selectedUniverseId, chartDataNW, chartDataLev, chartDataProb, chartDataSurvival, simResults, viewMode, isSimulating]);
+            }, [selectedUniverseId, chartDataNW, chartDataLev, chartDataProb, chartDataSurvival, simResults, viewMode, chartDataCashFlow, isSimulating]);
 
             const handleSliderChange = (rank) => {
                 if (!stats.sortedIndices || stats.sortedIndices.length === 0) return;
@@ -1416,7 +1475,7 @@
                 const originalIdx = stats.sortedIndices[arrIndex];
                 setSelectedUniverseId(originalIdx + 1); 
                 setSelectedUniverseIndex(rank);
-                if (viewMode === 'survival' || viewMode === 'targetProb') setViewMode('netWorth');
+                if (viewMode === 'survival' || viewMode === 'targetProb' || viewMode === 'cashFlow') setViewMode('netWorth');
             };
             
             const handleRowClick = (id) => {
@@ -1445,9 +1504,9 @@
                     <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
                         <div className="p-2 bg-indigo-600 rounded-lg text-white shadow-md"> <Activity size={24} /> </div>
-                        增貸投資壓力測試模擬器 v2.38
+                        增貸投資壓力測試模擬器 v2.47
                     </h1>
-                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">P50 錨定版 (P50 Anchor)</span> </p>
+                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">符號統一版 (Sign Consistency)</span> </p>
                     </div>
                 </div>
 
@@ -1731,8 +1790,9 @@
                                 </h2>
                                 
                                 {selectedUniverseId === null && viewMode === 'survival' && <p className="text-xs text-red-500 mt-1 font-bold">檢視策略的死亡風險：曲線越陡峭，代表破產歸零的機率越高</p>}
-                                {selectedUniverseId === null && viewMode !== 'targetProb' && viewMode !== 'survival' && <p className="text-xs text-slate-400 mt-1 font-medium">隨機呈現 50 條市場路徑，展示真實的波動風險 (暖色=有貸, 冷色=無貸)</p>}
+                                {selectedUniverseId === null && viewMode !== 'targetProb' && viewMode !== 'survival' && viewMode !== 'cashFlow' && <p className="text-xs text-slate-400 mt-1 font-medium">隨機呈現 50 條市場路徑，展示真實的波動風險 (暖色=有貸, 冷色=無貸)</p>}
                                 {viewMode === 'targetProb' && <p className="text-xs text-slate-400 mt-1 font-medium">顯示有多少比例的平行宇宙在特定時間點前已達成 {targetAmount} 萬目標</p>}
+                                {viewMode === 'cashFlow' && <p className="text-xs text-slate-400 mt-1 font-medium">分析每個月的資金流入(儲蓄)與流出(還款)，正值為安全區間，負值需變賣資產</p>}
 
                             </div>
                             <div className="flex items-center gap-2">
@@ -1740,6 +1800,7 @@
                                     <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-bold shadow-inner">
                                         <button onClick={() => setViewMode('netWorth')} className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'netWorth' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}> <Eye size={14} /> 淨值 </button>
                                         <button onClick={() => setViewMode('leverage')} className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'leverage' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}> <Scale size={14} /> 槓桿 </button>
+                                        <button onClick={() => setViewMode('cashFlow')} className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'cashFlow' ? 'bg-white text-teal-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}> <Banknote size={14} /> 現金流 </button>
                                         <button onClick={() => setViewMode('targetProb')} className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'targetProb' ? 'bg-white text-rose-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}> <Target size={14} /> 達標機率 </button>
                                         <button onClick={() => setViewMode('survival')} className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'survival' ? 'bg-white text-red-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}> <HeartPulse size={14} /> 生存率 </button>
                                     </div>
@@ -1777,9 +1838,10 @@
                                         fontSize={12} 
                                         tickFormatter={(val) => {
                                             if (viewMode === 'targetProb' || viewMode === 'survival') return `${val}%`;
-                                            return val > 50 || val < -50 ? val.toLocaleString() : val.toFixed(1) + 'x';
+                                            if (viewMode === 'leverage') return `${val}x`;
+                                            return val > 10000 || val < -10000 ? (val/10000).toFixed(1)+'億' : val.toLocaleString();
                                         }} 
-                                        label={{ value: viewMode === 'netWorth' ? '淨值 (萬)' : (viewMode === 'survival' ? '生存機率 (%)' : (viewMode === 'leverage' ? '槓桿倍數 (x)' : '達標機率 (%)')), angle: -90, position: 'insideLeft', offset: -5, style: { textAnchor: 'middle', fontSize: 11, fill: '#64748b' } }} 
+                                        label={{ value: viewMode === 'netWorth' ? '淨值 (萬)' : (viewMode === 'survival' ? '生存機率 (%)' : (viewMode === 'leverage' ? '槓桿倍數 (x)' : (viewMode === 'cashFlow' ? '金額 (萬)' : '達標機率 (%)'))), angle: -90, position: 'insideLeft', offset: -5, style: { textAnchor: 'middle', fontSize: 11, fill: '#64748b' } }} 
                                         tickLine={false} 
                                         axisLine={false} 
                                         domain={yAxisDomain}
@@ -1792,22 +1854,30 @@
                                         verticalAlign="top" 
                                         height={40} 
                                         content={<CustomLegend visibleSeries={visibleSeries} onToggle={toggleSeries} />}
-                                        payload={(viewMode === 'targetProb' || viewMode === 'survival') ? [
-                                            { value: viewMode === 'survival' ? '生存率 (有貸款)' : '達標機率 (有貸款)', type: 'line', color: viewMode === 'survival' ? "#dc2626" : "#ea580c", id: 'probLev' }, 
-                                            { value: viewMode === 'survival' ? '生存率 (無貸款)' : '達標機率 (無貸款)', type: 'line', color: "#0ea5e9", id: 'probBase' }, 
-                                        ] : (selectedUniverseId !== null ? [
-                                            { value: '該宇宙-有貸款', type: 'line', color: "#ea580c", id: 'leveraged' }, 
-                                            { value: '該宇宙-無貸款', type: 'line', color: "#0ea5e9", id: 'noLoan' }, 
-                                        ] : [ 
-                                            { value: '有貸款 (P50)', type: 'line', color: "#ea580c", id: 'leveraged' }, 
-                                            { value: '無貸款 (P50)', type: 'line', color: "#0ea5e9", id: 'noLoan' }, 
-                                        ])} 
+                                        payload={
+                                            viewMode === 'cashFlow' ? [
+                                                { value: '每月投入 (儲蓄)', type: 'line', color: "#3b82f6", id: 'monthlyInjection' }, 
+                                                { value: '每月還款 (本息)', type: 'line', color: "#ef4444", id: 'monthlyPayment' },
+                                                { value: '淨現金流', type: 'line', color: "#22c55e", id: 'netCashFlow' },
+                                            ] : 
+                                            (viewMode === 'targetProb' || viewMode === 'survival') ? [
+                                                { value: viewMode === 'survival' ? '生存率 (有貸款)' : '達標機率 (有貸款)', type: 'line', color: viewMode === 'survival' ? "#dc2626" : "#ea580c", id: 'probLev' }, 
+                                                { value: viewMode === 'survival' ? '生存率 (無貸款)' : '達標機率 (無貸款)', type: 'line', color: "#0ea5e9", id: 'probBase' }, 
+                                            ] : (selectedUniverseId !== null ? [
+                                                { value: '該宇宙-有貸款', type: 'line', color: "#ea580c", id: 'leveraged' }, 
+                                                { value: '該宇宙-無貸款', type: 'line', color: "#0ea5e9", id: 'noLoan' }, 
+                                            ] : [ 
+                                                { value: '有貸款 (P50)', type: 'line', color: "#ea580c", id: 'leveraged' }, 
+                                                { value: '無貸款 (P50)', type: 'line', color: "#0ea5e9", id: 'noLoan' }, 
+                                            ])
+                                        } 
                                     />
                                     
                                     {viewMode === 'netWorth' && ( <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="5 5" strokeWidth={2} /> )}
                                     {viewMode === 'leverage' && ( <ReferenceLine y={1} stroke="#0ea5e9" strokeDasharray="3 3" label={{ value: '無槓桿 (1.0x)', fill: '#0ea5e9', fontSize: 10 }} /> )}
                                     {viewMode === 'targetProb' && ( <ReferenceLine y={50} stroke="#94a3b8" strokeDasharray="3 3" label={{ value: '50% 機率線', fill: '#94a3b8', fontSize: 10 }} /> )}
                                     {viewMode === 'survival' && ( <ReferenceLine y={100} stroke="#94a3b8" strokeDasharray="3 3" /> )}
+                                    {viewMode === 'cashFlow' && ( <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" strokeWidth={1} /> )}
 
                                     {/* Ruin Indicator: Show ReferenceDot if focusing on a dead universe */}
                                     {selectedUniverseId !== null && simResults[selectedUniverseId-1]?.isZombie && simResults[selectedUniverseId-1]?.bustYear && viewMode === 'netWorth' && (
@@ -1844,6 +1914,14 @@
                                         <>
                                             <Area type="monotone" dataKey="p50Lev" stroke={viewMode === 'survival' ? "#dc2626" : "#ea580c"} fill={viewMode === 'survival' ? "#dc2626" : "#ea580c"} fillOpacity={0.1} strokeWidth={3} name={viewMode === 'survival' ? "survivalLev" : "probLev"} />
                                             <Area type="monotone" dataKey="p50Base" stroke="#0ea5e9" fill="#0ea5e9" fillOpacity={0.1} strokeWidth={3} name={viewMode === 'survival' ? "survivalBase" : "probBase"} />
+                                        </>
+                                    )}
+
+                                    {viewMode === 'cashFlow' && (
+                                        <>
+                                            <Line type="monotone" dataKey="monthlyInjection" stroke="#3b82f6" strokeWidth={2} dot={false} name="monthlyInjection" />
+                                            <Line type="monotone" dataKey="monthlyPayment" stroke="#ef4444" strokeWidth={2} dot={false} name="monthlyPayment" />
+                                            <Line type="monotone" dataKey="netCashFlow" stroke="#22c55e" strokeWidth={2} dot={false} name="netCashFlow" />
                                         </>
                                     )}
                                     
@@ -1991,12 +2069,39 @@
                             <h4 className="text-sm font-bold text-amber-900 mb-2">模型限制與校正提醒 (Model Disclaimers)</h4>
                             
                             <ul className="text-xs text-amber-800 space-y-1.5 list-disc list-inside opacity-90">
+                                <li><strong>v2.47 符號統一 (Sign Consistency)</strong>：現金流 Tooltip 全面符號化，儲蓄投入顯示為+號(藍)，還款顯示為-號(紅)，淨流為+/-號(綠/橘)，提升閱讀直覺性。</li>
+                                <li><strong>v2.46 標記修復 (Tooltip Fix)</strong>：修復現金流 Tooltip 中淨現金流正負號顯示錯誤的問題，現在正數顯示+號(綠)，負數顯示-號(橘紅)。</li>
+                                <li><strong>v2.45 現金流視覺優化 (Visual Tweak)</strong>：現金流圖表優化：移除轉貸當下的本金進出顯示，專注於呈現每月的常態性現金流細節。</li>
+                                <li><strong>v2.44 完整修復 (Full Restoration)</strong>：修復了 v2.43 中因代碼整理而遺失的現金流邏輯與說明文字，並將現金流圖表優化為清晰的三線視圖（紅藍綠），此版本功能完整。</li>
+                                <li><strong>v2.43 運算修正 (Hotfix)</strong>：修復寬限期後本金攤還計算錯誤 (PMT公式修正)，還原真實還款壓力曲線。</li>
+                                <li><strong>v2.42 現金流修復 (Logic Fix)</strong>：修正借新還舊時的現金流重複計算問題，並將現金流圖表優化為紅(貸款)/藍(儲蓄)/綠(淨流)三線顯示。</li>
+                                <li><strong>v2.41 現金流透視 (Cash Flow Chart)</strong>：新增「現金流」圖表，可視化每月的投入與還款變化。並追加「過高槓桿」與「波動率拖累」的風險警示。</li>
+                                <li><strong>v2.40 評論邏輯精修 (Logic Refined)</strong>：優化潛水(P10 &lt; 80%本金)與雞肋策略(Spread &lt; Base*5%)的判定門檻，使其更符合真實心理感受。</li>
+                                <li><strong>v2.39 評論邏輯優化 (Logic Refined)</strong>：嚴格化風險判定：破產機率&gt;0.1%即為高風險，P10本金虧損&gt;20%視為潛水，並新增「雞肋策略」偵測。</li>
                                 <li><strong>v2.38 P50 錨定 (P50 Anchor)</strong>：於勝率下方顯示「有貸款策略的 P50 終值」，提供更具體的期望收益參考。</li>
-                                <li><strong>混合情境 (Hybrid Complexity)</strong>：支援同時模擬「房貸（不斷頭）」、「融資（會斷頭）」與「到期一次還本」的複雜債務組合。</li>
-                                <li><strong>流動性是唯一死穴 (Liquidity is King)</strong>：對於未啟用維持率限制的貸款（如房貸），唯一會導致破產的原因是「繳不出貸款」。請務必關注左側的「現金流警示」儀表板。</li>
-                                <li><strong>負資產心理壓力 (Psychological Pressure)</strong>：雖然房貸模式允許淨值為負（水下），但現實中看著資產負債表赤字需要極強的心理素質，請勿忽視心理帳戶的影響。</li>
-                                <li><strong>利率波動風險 (Interest Rate Risk)</strong>：本模型假設貸款利率為恆定。現實中，央行升息會導致融資成本上升，可能在市場低迷時進一步惡化現金流。</li>
-                                <li><strong>報酬順序風險 (Sequence of Returns Risk)</strong>：即使長期平均年化報酬達標，若初期遭遇連續大跌，槓桿策略的破產機率會顯著高於後期下跌。</li>
+                                <li><strong>v2.37 完整修復 (Full Restoration)</strong>：修復了 v2.36 中因代碼整理而遺失的現金流、圖表與稽核表等核心功能。</li>
+                                <li><strong>v2.36 說明優化 (Docs Refined)</strong>：更新模型限制說明，補完流動性風險、心理壓力與混合債務情境的詳細警示。</li>
+                                <li><strong>v2.35 視覺微調 (Visual Tweak)</strong>：槓桿圖縱軸最小值鎖定為 1x，符合槓桿投資定義（最低即為自有資金 1x）。</li>
+                                <li><strong>v2.34 結構修復 (Structure Fix)</strong>：修復組件定義順序問題，確保 Tooltip 與 Legend 能正常渲染。</li>
+                                <li><strong>v2.33 版本紀錄收納 (Collapsible History)</strong>：新增歷次更新紀錄清單，方便使用者回溯功能演進，並保持介面簡潔。</li>
+                                <li><strong>v2.32 視覺刻度優化 (Visual Optimized)</strong>：槓桿圖縱軸採智慧限縮 (Max 5x)，避免極端爆倉值壓縮正常波動顯示。</li>
+                                <li><strong>v2.31 圖表修復 (Chart Fixed)</strong>：修正淨值圖因 P90 計算異常導致消失的 Bug，強化防呆機制。</li>
+                                <li><strong>v2.30 時序鎖定 (Time Locked)</strong>：強制約束貸款啟動順序 (C≥B≥A)，防止時間軸錯亂與邏輯矛盾。</li>
+                                <li><strong>v2.29 餘額透視 (Balance Insight)</strong>：即時顯示轉貸當下的舊債餘額，並支援多筆貸款合力償還的資金缺口計算。</li>
+                                <li><strong>v2.28 邏輯收斂 (Logic Optimized)</strong>：簡化貸款 C 的還款邏輯，支援與 B 合力償還 A，並優化介面文字。</li>
+                                <li><strong>v2.25 精確餘額 (Precise Balance)</strong>：轉貸警示改採「本金攤還後餘額」計算，而非原始金額，避免誤報資金不足。</li>
+                                <li><strong>v2.24 減資警示 (De-leveraging)</strong>：當新貸金額不足償還舊債時，自動警示差額將由股票資產扣除。</li>
+                                <li><strong>v2.22 邏輯驗證 (Final Logic Check)</strong>：修復借新還舊與到期全還並存時的重複扣款問題 (Double Deduction Fix)。</li>
+                                <li><strong>v2.20 借新還舊 (Debt Recycling)</strong>：新增轉貸功能，新貸款啟動時可自動結清舊貸款餘額。</li>
+                                <li><strong>v2.19 信貸接龍 (Loan Laddering)</strong>：新增延遲投入功能，支援模擬分批進場或接力借款策略。</li>
+                                <li><strong>v2.18 智能連動 (Smart Linked)</strong>：勾選「只還息」時自動連動「到期全還」，反映真實還款壓力。</li>
+                                <li><strong>v2.17 風險註釋 (Risk Note)</strong>：到期全還選項新增「模擬不能續約」註記，強化風險提示。</li>
+                                <li><strong>v2.16 介面精修 (UI Refined)</strong>：統一風險選項視覺風格，移除不必要的分隔線與透明度。</li>
+                                <li><strong>v2.15 融資還本共存 (Hybrid Debt)</strong>：支援同時開啟維持率限制與到期全還，模擬更複雜的金融商品。</li>
+                                <li><strong>v2.11 混合債務修正 (Logic Fixed)</strong>：修正融資維持率分母計算，排除房貸部位影響，避免低估安全性。</li>
+                                <li><strong>v2.9 維持率機制 (Margin Call)</strong>：引入融資斷頭機制，資產低於維持率強制平倉。</li>
+                                <li><strong>v2.7 壓力測試 (Stress Test)</strong>：新增一鍵壓力測試按鈕與圖表破產標記功能。</li>
+                                <li><strong>v2.5 穩定修復 (Stable Release)</strong>：修正圖表載入異常與中位數計算邏輯，提升模擬穩定性。</li>
                             </ul>
 
                             <div className="mt-3 pt-3 border-t border-amber-200/50">
