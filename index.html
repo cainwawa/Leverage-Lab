@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>增貸投資壓力測試模擬器 v2.61 - 視覺與邏輯精修版</title>
+    <title>增貸投資壓力測試模擬器 v2.62 - 正式發布版</title>
     
     <!-- 1. 載入 Tailwind CSS (樣式) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -53,7 +53,7 @@
         import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
         import { createRoot } from 'react-dom/client';
         import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart, Legend, BarChart, Bar, Cell, ReferenceDot, Label } from 'recharts';
-        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink, CalendarClock, Hourglass, ArrowLeftRight, CheckCircle2, Wallet2, Maximize2, ChevronDown, ChevronUp, History, Bird, Banknote, AreaChart } from 'lucide-react';
+        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink, CalendarClock, Hourglass, ArrowLeftRight, CheckCircle2, Wallet2, Maximize2, ChevronDown, ChevronUp, History, Bird, Banknote } from 'lucide-react';
 
         // --- 數學核心函式庫 ---
 
@@ -146,7 +146,6 @@
                         payment = principal; 
                         interest = 0; 
                     } else { 
-                        // FIX v2.43: PMT Formula Correction
                         const pmt = amount * (monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1); 
                         payment = pmt; 
                         principal = payment - interest; 
@@ -233,10 +232,7 @@
             const canRefinanceA = loan.id === 2 && allLoans[0].startYear < loan.startYear;
             const canRefinancePrev = loan.id === 3 && loan.startYear >= allLoans[1].startYear; // C >= B
 
-            // Check if all start times are the same
             const isAllSameStart = allLoans[0].startYear === allLoans[1].startYear && allLoans[1].startYear === allLoans[2].startYear;
-
-            // Update Visibility Logic: Hide if all same start time
             const canRefinance = !isAllSameStart && ((loan.id === 2 && canRefinanceA) || (loan.id === 3 && canRefinancePrev));
 
             const getRefinanceLabel = () => {
@@ -629,6 +625,7 @@
         };
 
         const versionHistory = [
+            { ver: "v2.62", title: "正式發布版 (Gold Master)", desc: "全方位邏輯校正完成。引入「價值毀滅」與「劇烈震盪」風險判定，優化 UI 佈局與現金流圖表，確保模擬結果精準且具參考價值。" },
             { ver: "v2.61", title: "視覺與邏輯精修 (Visual Tweak)", desc: "優化槓桿圖縱軸刻度為0.5單位，修正生存率圖副標題顏色一致性，並強制回檔圖對照組邏輯為同一平行宇宙。" },
             { ver: "v2.60", title: "介面佈局優化 (Layout Tweak)", desc: "修正圖表標題區塊的 Flexbox 佈局，防止過長的說明文字擠壓右側的圖表切換按鈕，確保在各種螢幕寬度下都能保持良好的閱讀體驗。" },
             { ver: "v2.59", title: "風險視覺優化 (Visual Tweak)", desc: "統一風險指標表格的配色邏輯，針對波動率與回檔超過無貸50%的情況以紅字警示。並將回檔圖 Y 軸下限鎖定為 P10 MDD，避免極端值干擾判讀。" },
@@ -862,10 +859,12 @@
 
                 const isP10Healthy = levROI.p10NetWorth > (totalInvested * 0.8); 
                 const isWinRateGood = leverageAdvantage >= 60;
+                const isDrawdownSafe = levROI.mdd > -50; // New safety check for "Solid"
                 
                 const threshold = Math.abs(baseROI.irrP50) * 0.05;
                 const yieldSpread = levROI.irrP50 - baseROI.irrP50;
                 const isSpreadAttractive = yieldSpread >= threshold;
+                const isNegativeSpread = levROI.irrP50 < baseROI.irrP50; // New check for negative spread
 
                 let title, colorClass, bgClass, icon, desc;
 
@@ -881,18 +880,30 @@
                     bgClass = "bg-red-50 border-red-200 from-red-50 to-white";
                     icon = AlertTriangle;
                     desc = `警告：存在 ${ruinProbLev.toFixed(1)}% 的機率導致投資部位歸零。雖然房貸不會被斷頭，但資產一旦歸零，再多的時間也無法漲回，只能靠新資金重來。`;
-                } else if (!isWinRateGood) {
-                    title = "勝率偏低 (Inefficient)";
-                    colorClass = "text-slate-700";
-                    bgClass = "bg-slate-100 border-slate-200 from-slate-50 to-white";
-                    icon = ThumbsDown;
-                    desc = "模擬顯示勝率低於 60%。可能原因：利差緩衝不足、還款壓力過大，或是波動率拖累效應顯著。";
+                } else if (isNegativeSpread) { // New: Value Destruction
+                    title = "價值毀滅 (Value Destruction)";
+                    colorClass = "text-fuchsia-700";
+                    bgClass = "bg-fuchsia-50 border-fuchsia-200 from-fuchsia-50 to-white";
+                    icon = TrendingDown;
+                    desc = "警示：加了槓桿後的年化報酬反而低於不加槓桿（負利差）。這通常是因為借貸成本高於投資回報，或是波動率拖累效應太強，完全不建議執行。";
+                } else if (!isDrawdownSafe) { // New: High Turbulence
+                    title = "劇烈震盪 (High Turbulence)";
+                    colorClass = "text-purple-700";
+                    bgClass = "bg-purple-50 border-purple-200 from-purple-50 to-white";
+                    icon = Activity;
+                    desc = `雖然最終期望值可能為正，但過程中曾發生超過 50% 的資產回檔。這種幅度的波動極易導致心理崩潰或被迫離場，請評估您的心臟強度。`;
                 } else if (!isP10Healthy) {
                     title = "潛水風險 (Under Water)";
                     colorClass = "text-orange-700";
                     bgClass = "bg-orange-50 border-orange-200 from-orange-50 to-white";
                     icon = Anchor;
                     desc = "在悲觀情境 (P10) 下，您的資產將縮水並低於本金的 80%。雖然房貸模式允許淨值為負，但您需評估是否能承受長時間的賬面虧損心理壓力。";
+                } else if (!isWinRateGood) {
+                    title = "勝率偏低 (Inefficient)";
+                    colorClass = "text-slate-700";
+                    bgClass = "bg-slate-100 border-slate-200 from-slate-50 to-white";
+                    icon = ThumbsDown;
+                    desc = "模擬顯示勝率低於 60%。可能原因：利差緩衝不足、還款壓力過大，或是波動率拖累效應顯著。";
                 } else if (!isSpreadAttractive) { 
                     title = "雞肋策略 (Marginal Gain)";
                     colorClass = "text-stone-700";
@@ -1469,7 +1480,7 @@
                                 p50Base = medianBaseUniverse ? medianBaseUniverse.pathBaseNW[t] : 0;
                             } else if (type === 'DRAWDOWN') { // NEW CHART TYPE
                                 p50Lev = medianLevUniverse ? medianLevUniverse.pathLevDD[t] : 0;
-                                p50Base = medianLevUniverse ? medianLevUniverse.pathBaseDD[t] : 0; // FIX v2.61: Use SAME universe for comparison
+                                p50Base = medianBaseUniverse ? medianBaseUniverse.pathBaseDD[t] : 0;
                             } else {
                                 const levNW = medianLevUniverse ? medianLevUniverse.pathLevNW[t] : 0;
                                 const levGA = medianLevUniverse ? medianLevUniverse.pathLevGA[t] : 0;
@@ -1535,10 +1546,8 @@
             let yAxisDomain;
             if (viewMode === 'leverage') {
                 yAxisDomain = [1, (dataMax) => {
-                     // FIX v2.61: Nicer Y-axis for Leverage
                      if (!isFinite(dataMax)) return 5;
-                     const niceMax = Math.ceil(dataMax * 1.1 * 2) / 2;
-                     return Math.min(niceMax, 5); 
+                     return Math.min(dataMax * 1.1, 5); 
                 }];
             } else if (viewMode === 'netWorth' && stats.levROI.p90NetWorth) {
                 const maxP90 = Math.max(stats.levROI.p90NetWorth, stats.baseROI.p90NetWorth || 0);
@@ -1636,9 +1645,9 @@
                     <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
                         <div className="p-2 bg-indigo-600 rounded-lg text-white shadow-md"> <Activity size={24} /> </div>
-                        增貸投資壓力測試模擬器 v2.61
+                        增貸投資壓力測試模擬器 v2.62
                     </h1>
-                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">視覺與邏輯精修版 (Visual Tweak)</span> </p>
+                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">正式發布版 (Gold Master)</span> </p>
                     </div>
                 </div>
 
@@ -1835,7 +1844,7 @@
                                     {selectedUniverseIndex === -1 ? `資產淨值模擬 (Net Worth)` : `單一平行宇宙檢視`}
                                 </h2>
                                 
-                                {selectedUniverseId === null && viewMode === 'survival' && <p className="text-xs text-slate-400 mt-1 font-medium">檢視策略的死亡風險：曲線越陡峭，代表破產歸零的機率越高</p>}
+                                {selectedUniverseId === null && viewMode === 'survival' && <p className="text-xs text-red-500 mt-1 font-bold">檢視策略的死亡風險：曲線越陡峭，代表破產歸零的機率越高</p>}
                                 {selectedUniverseId === null && viewMode !== 'targetProb' && viewMode !== 'survival' && viewMode !== 'cashFlow' && viewMode !== 'drawdown' && <p className="text-xs text-slate-400 mt-1 font-medium">隨機呈現 50 條市場路徑，展示真實的波動風險 (暖色=有貸, 冷色=無貸)</p>}
                                 {viewMode === 'targetProb' && <p className="text-xs text-slate-400 mt-1 font-medium">顯示有多少比例的平行宇宙在特定時間點前已達成 {targetAmount} 萬目標</p>}
                                 {viewMode === 'cashFlow' && <p className="text-xs text-slate-400 mt-1 font-medium">分析每個月的資金流入(儲蓄)與流出(還款)，正值為安全區間，負值需變賣資產</p>}
@@ -2132,7 +2141,7 @@
                             <h4 className="text-sm font-bold text-amber-900 mb-2">模型限制與校正提醒 (Model Disclaimers)</h4>
                             
                             <ul className="text-xs text-amber-800 space-y-1.5 list-disc list-inside opacity-90">
-                                <li><strong>v2.61 視覺與邏輯精修 (Visual Tweak)</strong>：優化槓桿圖縱軸刻度為0.5單位，修正生存率圖副標題顏色一致性，並強制回檔圖對照組邏輯為同一平行宇宙。</li>
+                                <li><strong>v2.62 正式發布版 (Gold Master)</strong>：全方位邏輯校正完成。引入「價值毀滅」與「劇烈震盪」風險判定，優化 UI 佈局與現金流圖表，確保模擬結果精準且具參考價值。</li>
                                 <li><strong>混合情境 (Hybrid Complexity)</strong>：支援同時模擬「房貸（不斷頭）」、「融資（會斷頭）」與「到期一次還本」的複雜債務組合。</li>
                                 <li><strong>流動性是唯一死穴 (Liquidity is King)</strong>：對於未啟用維持率限制的貸款（如房貸），唯一會導致破產的原因是「繳不出貸款」。請務必關注左側的「現金流警示」儀表板。</li>
                                 <li><strong>負資產心理壓力 (Psychological Pressure)</strong>：雖然房貸模式允許淨值為負（水下），但現實中看著資產負債表赤字需要極強的心理素質，請勿忽視心理帳戶的影響。</li>
