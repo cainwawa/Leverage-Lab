@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>增貸投資壓力測試模擬器 v2.64 - 視覺刻度優化版</title>
+    <title>增貸投資壓力測試模擬器 v2.65 - 功能完整修復版</title>
     
     <!-- 1. 載入 Tailwind CSS (樣式) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -53,7 +53,7 @@
         import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
         import { createRoot } from 'react-dom/client';
         import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart, Legend, BarChart, Bar, Cell, ReferenceDot, Label } from 'recharts';
-        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink, CalendarClock, Hourglass, ArrowLeftRight, CheckCircle2, Wallet2, Maximize2, ChevronDown, ChevronUp, History, Bird, Banknote } from 'lucide-react';
+        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink, CalendarClock, Hourglass, ArrowLeftRight, CheckCircle2, Wallet2, Maximize2, ChevronDown, ChevronUp, History, Bird, Banknote, AreaChart } from 'lucide-react';
 
         // --- 數學核心函式庫 ---
 
@@ -146,6 +146,7 @@
                         payment = principal; 
                         interest = 0; 
                     } else { 
+                        // FIX v2.43: PMT Formula Correction
                         const pmt = amount * (monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1); 
                         payment = pmt; 
                         principal = payment - interest; 
@@ -628,6 +629,7 @@
         };
 
         const versionHistory = [
+            { ver: "v2.65", title: "功能完整修復 (Full Restoration)", desc: "修復了在 v2.64 UI 調整過程中意外遺失的「觸碰目標金額所需時間」分析面板，現在您可以完整查看 P10/P50/P90 達標年份與期望節省時間。" },
             { ver: "v2.64", title: "視覺刻度優化 (Visual Scale Fix)", desc: "針對「回檔圖」縱軸進行智慧限縮，將最小值鎖定在 P10 悲觀回檔附近，避免單一極端路徑壓縮整體圖形，提升閱讀辨識度。" },
             { ver: "v2.63", title: "路徑一致性修正 (Consistency Fix)", desc: "修正圖表邏輯，強制「有貸」與「無貸」的 P50 線對應同一個平行宇宙（以有貸中位數為準），確保回檔比較基準一致。風險表格則維持獨立統計。" },
             { ver: "v2.62", title: "正式發布版 (Gold Master)", desc: "全方位邏輯校正完成。引入「價值毀滅」與「劇烈震盪」風險判定，優化 UI 佈局與現金流圖表，確保模擬結果精準且具參考價值。" },
@@ -1458,7 +1460,6 @@
 
                     const processChartData = (type) => {
                         const stats = [];
-                        // FIX v2.63: Use the SAME median Lev universe for Base chart comparison to ensure path consistency
                         const sortedByLevFinal = [...allUniverses].sort((a, b) => a.finalLevNet - b.finalLevNet);
                         const medianLevUniverse = sortedByLevFinal[Math.floor(simulationCount * 0.5)] || sortedByLevFinal[0]; 
                         
@@ -1661,9 +1662,9 @@
                     <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
                         <div className="p-2 bg-indigo-600 rounded-lg text-white shadow-md"> <Activity size={24} /> </div>
-                        增貸投資壓力測試模擬器 v2.64
+                        增貸投資壓力測試模擬器 v2.65
                     </h1>
-                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">視覺刻度優化版 (Visual Scale Fix)</span> </p>
+                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">功能完整修復版 (Full Restoration)</span> </p>
                     </div>
                 </div>
 
@@ -1818,7 +1819,7 @@
                             </div>
                         </div>
 
-                        <div className={`rounded-2xl p-5 border shadow-sm transition-all duration-300 mt-6 ${cashFlowStatus.hasNegativeFlow ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                    <div className={`rounded-2xl p-5 border shadow-sm transition-all duration-300 mt-6 ${cashFlowStatus.hasNegativeFlow ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
                         <div className="flex items-start gap-4">
                             <div className={`p-2.5 rounded-full border shadow-sm shrink-0 ${cashFlowStatus.hasNegativeFlow ? 'bg-white border-red-100 text-red-600' : 'bg-white border-green-100 text-green-600'}`}>
                                 {cashFlowStatus.hasNegativeFlow ? <AlertOctagon className="w-6 h-6" /> : <ShieldCheck className="w-6 h-6" />}
@@ -1849,6 +1850,115 @@
                                         您的每月儲蓄投入金額高於貸款還款額，即使在貸款壓力最大的年份，也不會發生被迫賣股的情況。這是最安全的槓桿操作模式。
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6 mt-6">
+                        <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <Clock size={16} /> 觸碰 {targetAmount} 萬 目標所需時間 (Time to Hit Target)
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-orange-50 rounded-xl p-4 border border-orange-100 relative overflow-hidden">
+                                {(100 - stats.timeStats.lev.successRate) > 30 && (
+                                    <div className="absolute -right-6 -top-6 w-24 h-24 bg-red-100 rounded-full opacity-50 blur-xl pointer-events-none"></div>
+                                )}
+                                <div className="flex justify-between items-start mb-3 border-b border-orange-200 pb-2">
+                                    <span className="font-bold text-orange-900 text-base">有貸款</span>
+                                    <div className="flex flex-col items-end">
+                                        <span className={`text-xs font-bold px-2 py-1 rounded flex items-center gap-1 ${
+                                            (100 - stats.timeStats.lev.successRate) > 20 
+                                            ? 'bg-red-100 text-red-700 border border-red-200' 
+                                            : 'text-orange-700 bg-orange-200'
+                                        }`}>
+                                            {(100 - stats.timeStats.lev.successRate) > 20 && <AlertTriangle size={10} />}
+                                            未達標率: {(100 - stats.timeStats.lev.successRate).toFixed(1)}%
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-emerald-700 font-medium flex items-center gap-1">樂觀 (P90) <span className="text-[10px] opacity-70">市場大好</span></span>
+                                        <span className="font-mono font-bold text-emerald-700 text-lg">{stats.timeStats.lev.p10 ? stats.timeStats.lev.p10.toFixed(1) + ' 年' : '-'}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-indigo-700 font-medium flex items-center gap-1">中位 (P50) <span className="text-[10px] opacity-70">市場普通</span></span>
+                                        <span className="font-mono font-bold text-indigo-700 text-lg">{stats.timeStats.lev.p50 ? stats.timeStats.lev.p50.toFixed(1) + ' 年' : '-'}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-red-700 font-medium flex items-center gap-1">悲觀 (P10) <span className="text-[10px] opacity-70">市場大跌</span></span>
+                                        <span className="font-mono font-bold text-red-700 text-lg">{stats.timeStats.lev.p90 ? stats.timeStats.lev.p90.toFixed(1) + ' 年' : '-'}</span>
+                                    </div>
+                                    <div className="pt-2 border-t border-orange-200 flex justify-between items-center">
+                                        <span className="text-sm text-orange-800/70 font-medium">平均時間</span>
+                                        <span className="font-mono font-bold text-orange-900">{stats.timeStats.lev.avg ? stats.timeStats.lev.avg.toFixed(1) + ' 年' : '-'}</span>
+                                    </div>
+                                </div>
+                                {(100 - stats.timeStats.lev.successRate) > 0 && (
+                                    <div className="mt-3 pt-2 border-t border-orange-200/50">
+                                         <p className="text-[10px] text-red-600 font-bold leading-tight flex items-start gap-1">
+                                            <AlertOctagon size={12} className="shrink-0 mt-0.5"/>
+                                            注意：{(100 - stats.timeStats.lev.successRate).toFixed(1)}% 的平行宇宙在 {years} 年內完全無法達成目標。平均時間僅代表成功者的數據。
+                                         </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-white rounded-xl p-4 border border-slate-200 flex flex-col justify-center items-center text-center">
+                                <div className="mb-4">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-1 flex items-center gap-1 justify-center">
+                                        <Sigma size={12}/> 期望節省時間 (Integral)
+                                    </span>
+                                    <div className="text-3xl font-black text-slate-800 tracking-tight">
+                                        {stats.timeStats.integralDiff > 0 ? '+' : ''}{stats.timeStats.integralDiff.toFixed(2)}
+                                        <span className="text-sm font-bold text-slate-500 ml-1">年</span>
+                                    </div>
+                                </div>
+                                
+                                {stats.timeStats.integralDiff > 0 ? (
+                                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-full font-bold text-sm">
+                                        <Timer size={16} /> 統計期望加速
+                                    </div>
+                                ) : (
+                                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-full font-bold text-sm">
+                                        <Timer size={16} /> 無加速效應
+                                    </div>
+                                )}
+                                
+                                <p className="text-xs text-slate-400 mt-3 px-2 leading-relaxed">
+                                    此數值為「達標機率曲線」之間的面積積分。代表綜合考量所有市場好壞情境後，槓桿策略平均為您買回的自由時間。
+                                </p>
+                            </div>
+
+                            <div className="bg-sky-50 rounded-xl p-4 border border-sky-100 relative overflow-hidden">
+                                <div className="flex justify-between items-start mb-3 border-b border-sky-200 pb-2">
+                                    <span className="font-bold text-sky-900 text-base">無貸款</span>
+                                    <span className={`text-xs font-bold px-2 py-1 rounded ${
+                                        (100 - stats.timeStats.base.successRate) > 20 
+                                        ? 'bg-slate-200 text-slate-700' 
+                                        : 'text-sky-700 bg-sky-200'
+                                    }`}>
+                                        未達標率: {(100 - stats.timeStats.base.successRate).toFixed(1)}%
+                                    </span>
+                                </div>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-emerald-700 font-medium">樂觀 (P90)</span>
+                                        <span className="font-mono font-bold text-emerald-700 text-lg">{stats.timeStats.base.p10 ? stats.timeStats.base.p10.toFixed(1) + ' 年' : '-'}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-indigo-700 font-medium">中位 (P50)</span>
+                                        <span className="font-mono font-bold text-indigo-700 text-lg">{stats.timeStats.base.p50 ? stats.timeStats.base.p50.toFixed(1) + ' 年' : '-'}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-red-700 font-medium">悲觀 (P10)</span>
+                                        <span className="font-mono font-bold text-red-700 text-lg">{stats.timeStats.base.p90 ? stats.timeStats.base.p90.toFixed(1) + ' 年' : '-'}</span>
+                                    </div>
+                                    <div className="pt-2 border-t border-sky-200 flex justify-between items-center">
+                                        <span className="text-sm text-sky-800/70 font-medium">平均時間</span>
+                                        <span className="font-mono font-bold text-sky-900">{stats.timeStats.base.avg ? stats.timeStats.base.avg.toFixed(1) + ' 年' : '-'}</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2157,12 +2267,57 @@
                             <h4 className="text-sm font-bold text-amber-900 mb-2">模型限制與校正提醒 (Model Disclaimers)</h4>
                             
                             <ul className="text-xs text-amber-800 space-y-1.5 list-disc list-inside opacity-90">
+                                <li><strong>v2.65 功能完整修復 (Full Restoration)</strong>：修復了在 v2.64 UI 調整過程中意外遺失的「觸碰目標金額所需時間」分析面板，現在您可以完整查看 P10/P50/P90 達標年份與期望節省時間。</li>
                                 <li><strong>v2.64 視覺刻度優化 (Visual Scale Fix)</strong>：針對「回檔圖」縱軸進行智慧限縮，將最小值鎖定在 P10 悲觀回檔附近，避免單一極端路徑壓縮整體圖形，提升閱讀辨識度。</li>
-                                <li><strong>混合情境 (Hybrid Complexity)</strong>：支援同時模擬「房貸（不斷頭）」、「融資（會斷頭）」與「到期一次還本」的複雜債務組合。</li>
-                                <li><strong>流動性是唯一死穴 (Liquidity is King)</strong>：對於未啟用維持率限制的貸款（如房貸），唯一會導致破產的原因是「繳不出貸款」。請務必關注左側的「現金流警示」儀表板。</li>
-                                <li><strong>負資產心理壓力 (Psychological Pressure)</strong>：雖然房貸模式允許淨值為負（水下），但現實中看著資產負債表赤字需要極強的心理素質，請勿忽視心理帳戶的影響。</li>
-                                <li><strong>利率波動風險 (Interest Rate Risk)</strong>：本模型假設貸款利率為恆定。現實中，央行升息會導致融資成本上升，可能在市場低迷時進一步惡化現金流。</li>
-                                <li><strong>報酬順序風險 (Sequence of Returns Risk)</strong>：即使長期平均年化報酬達標，若初期遭遇連續大跌，槓桿策略的破產機率會顯著高於後期下跌。</li>
+                                <li><strong>v2.63 路徑一致性修正 (Consistency Fix)</strong>：修正圖表邏輯，強制「有貸」與「無貸」的 P50 線對應同一個平行宇宙（以有貸中位數為準），確保回檔比較基準一致。風險表格則維持獨立統計。</li>
+                                <li><strong>v2.62 正式發布版 (Gold Master)</strong>：全方位邏輯校正完成。引入「價值毀滅」與「劇烈震盪」風險判定，優化 UI 佈局與現金流圖表，確保模擬結果精準且具參考價值。</li>
+                                <li><strong>v2.61 視覺與邏輯精修 (Visual Tweak)</strong>：優化槓桿圖縱軸刻度為0.5單位，修正生存率圖副標題顏色一致性，並強制回檔圖對照組邏輯為同一平行宇宙。</li>
+                                <li><strong>v2.60 介面佈局優化 (Layout Tweak)</strong>：修正圖表標題區塊的 Flexbox 佈局，防止過長的說明文字擠壓右側的圖表切換按鈕，確保在各種螢幕寬度下都能保持良好的閱讀體驗。</li>
+                                <li><strong>v2.59 風險視覺優化 (Visual Tweak)</strong>：統一風險指標表格的配色邏輯，針對波動率與回檔超過無貸50%的情況以紅字警示。並將回檔圖 Y 軸下限鎖定為 P10 MDD，避免極端值干擾判讀。</li>
+                                <li><strong>v2.58 邏輯一致性終極版 (Consistency Ultimate)</strong>：修復了 v2.57 中標題版本號未更新的問題。針對風險評估邏輯進行了全面掃描與壓力測試，確認「借新還舊」、「P50 路徑鎖定」與「評論區警示」皆已達到穩定標準。</li>
+                                <li><strong>v2.57 圖表路徑一致 (Path Fix)</strong>：修正淨值、槓桿、回檔圖表邏輯，強制對照組（無貸款）取自同一個中位數平行宇宙，確保回檔波峰與市場震盪的一致性。</li>
+                                <li><strong>v2.56 路徑一致性鎖定 (Path Lock)</strong>：強制「淨值」、「槓桿」、「回檔」三張圖表的 P50 線對應同一個平行宇宙（中位數淨值路徑），並在回檔圖 Tooltip 中明確標示，確保多維度分析時的邏輯連貫性。</li>
+                                <li><strong>v2.55 專有名詞校正 (Terminology Fix)</strong>：統一風險指標名稱為「中位波動 (P50 VOL)」與「悲觀回檔 (P10 MDD)」，並修正回檔圖表標籤與 Tooltip 顯示邏輯，確保專業術語的一致性。</li>
+                                <li><strong>v2.54 深度風險解析 (Risk Insights)</strong>：新增「P50 中位波動」與「P10 悲觀回檔」兩大關鍵指標，並於表格中移除舊版標準差。評論系統也進行了重寫，針對波動率拖累與回檔心理壓力提供更精確的解讀。</li>
+                                <li><strong>v2.53 波動率與回檔分析 (Volatility & Drawdown)</strong>：新增「資產回檔 (Drawdown)」圖表與年化波動率、最大回檔數據統計，協助使用者量化槓桿帶來的心理壓力與實際風險。</li>
+                                <li><strong>v2.52 連動邏輯優化 (Sync Logic)</strong>：新增 C 貸同步啟動時自動勾選 B 貸轉貸選項的連動邏輯，並在全時序重疊時自動隱藏轉貸選項，避免邏輯矛盾。</li>
+                                <li><strong>v2.51 精度優化 (Precision Tweak)</strong>：現金流 Tooltip 數值顯示精確至小數點後第一位（單位：萬），並同步優化 Y 軸刻度，提供更細膩的資金流動細節。</li>
+                                <li><strong>v2.50 邏輯邊界修復 (Edge Case Fix)</strong>：修正「轉貸」與「到期還本」時間重疊時的雙重扣款 Bug。現在系統會優先執行轉貸，避免錯誤地觸發到期還款邏輯。</li>
+                                <li><strong>v2.49 邏輯最終修正 (Logic Finalized)</strong>：修正多筆貸款同時啟動且借新還舊時的重複扣款問題，現在系統會智慧判斷唯一償還者，確保資產計算絕對精確。</li>
+                                <li><strong>v2.48 同步啟動邏輯修正 (Sync Launch Fix)</strong>：修正貸款 B 與 C 同步啟動並勾選借新還舊時，因邏輯互斥導致 B 被註銷的 Bug。</li>
+                                <li><strong>v2.47 符號統一 (Sign Consistency)</strong>：現金流 Tooltip 全面符號化，儲蓄投入顯示為+號(藍)，還款顯示為-號(紅)，淨流為+/-號(綠/橘)，提升閱讀直覺性。</li>
+                                <li><strong>v2.46 標記修復 (Tooltip Fix)</strong>：修復現金流 Tooltip 中淨現金流正負號顯示錯誤的問題。</li>
+                                <li><strong>v2.45 現金流視覺優化 (Visual Tweak)</strong>：現金流圖表優化：移除轉貸當下的本金進出顯示，專注於呈現每月的常態性現金流細節。</li>
+                                <li><strong>v2.44 完整修復 (Full Restoration)</strong>：修復了 v2.43 中因代碼整理而遺失的現金流邏輯與說明文字，並將現金流圖表優化為清晰的三線視圖（紅藍綠），此版本功能完整。</li>
+                                <li><strong>v2.43 運算修正 (Hotfix)</strong>：修復寬限期後本金攤還計算錯誤 (PMT公式修正)，還原真實還款壓力曲線。</li>
+                                <li><strong>v2.42 現金流修復 (Logic Fix)</strong>：修正借新還舊時的現金流重複計算問題，並將現金流圖表優化為紅(貸款)/藍(儲蓄)/綠(淨流)三線顯示。</li>
+                                <li><strong>v2.41 現金流透視 (Cash Flow Chart)</strong>：新增「現金流」圖表，可視化每月的投入與還款變化。並追加「過高槓桿」與「波動率拖累」的風險警示。</li>
+                                <li><strong>v2.40 評論邏輯精修 (Logic Refined)</strong>：優化潛水(P10 &lt; 80%本金)與雞肋策略(Spread &lt; Base*5%)的判定門檻，使其更符合真實心理感受。</li>
+                                <li><strong>v2.39 評論邏輯優化 (Logic Refined)</strong>：嚴格化風險判定：破產機率&gt;0.1%即為高風險，P10本金虧損&gt;20%視為潛水，並新增「雞肋策略」偵測。</li>
+                                <li><strong>v2.38 P50 錨定 (P50 Anchor)</strong>：於勝率下方顯示「有貸款策略的 P50 終值」，提供更具體的期望收益參考。</li>
+                                <li><strong>v2.37 完整修復 (Full Restoration)</strong>：修復了 v2.36 中因代碼整理而遺失的現金流、圖表與稽核表等核心功能。</li>
+                                <li><strong>v2.36 說明優化 (Docs Refined)</strong>：更新模型限制說明，補完流動性風險、心理壓力與混合債務情境的詳細警示。</li>
+                                <li><strong>v2.35 視覺微調 (Visual Tweak)</strong>：槓桿圖縱軸最小值鎖定為 1x，符合槓桿投資定義（最低即為自有資金 1x）。</li>
+                                <li><strong>v2.34 結構修復 (Structure Fix)</strong>：修復組件定義順序問題，確保 Tooltip 與 Legend 能正常渲染。</li>
+                                <li><strong>v2.33 版本紀錄收納 (Collapsible History)</strong>：新增歷次更新紀錄清單，方便使用者回溯功能演進，並保持介面簡潔。</li>
+                                <li><strong>v2.32 視覺刻度優化 (Visual Optimized)</strong>：槓桿圖縱軸採智慧限縮 (Max 5x)，避免極端爆倉值壓縮正常波動顯示。</li>
+                                <li><strong>v2.31 圖表修復 (Chart Fixed)</strong>：修正淨值圖因 P90 計算異常導致消失的 Bug，強化防呆機制。</li>
+                                <li><strong>v2.30 時序鎖定 (Time Locked)</strong>：強制約束貸款啟動順序 (C≥B≥A)，防止時間軸錯亂與邏輯矛盾。</li>
+                                <li><strong>v2.29 餘額透視 (Balance Insight)</strong>：即時顯示轉貸當下的舊債餘額，並支援多筆貸款合力償還的資金缺口計算。</li>
+                                <li><strong>v2.28 邏輯收斂 (Logic Optimized)</strong>：簡化貸款 C 的還款邏輯，支援與 B 合力償還 A，並優化介面文字。</li>
+                                <li><strong>v2.25 精確餘額 (Precise Balance)</strong>：轉貸警示改採「本金攤還後餘額」計算，而非原始金額，避免誤報資金不足。</li>
+                                <li><strong>v2.24 減資警示 (De-leveraging)</strong>：當新貸金額不足償還舊債時，自動警示差額將由股票資產扣除。</li>
+                                <li><strong>v2.22 邏輯驗證 (Final Logic Check)</strong>：修復借新還舊與到期全還並存時的重複扣款問題 (Double Deduction Fix)。</li>
+                                <li><strong>v2.20 借新還舊 (Debt Recycling)</strong>：新增轉貸功能，新貸款啟動時可自動結清舊貸款餘額。</li>
+                                <li><strong>v2.19 信貸接龍 (Loan Laddering)</strong>：新增延遲投入功能，支援模擬分批進場或接力借款策略。</li>
+                                <li><strong>v2.18 智能連動 (Smart Linked)</strong>：勾選「只還息」時自動連動「到期全還」，反映真實還款壓力。</li>
+                                <li><strong>v2.17 風險註釋 (Risk Note)</strong>：到期全還選項新增「模擬不能續約」註記，強化風險提示。</li>
+                                <li><strong>v2.16 介面精修 (UI Refined)</strong>：統一風險選項視覺風格，移除不必要的分隔線與透明度。</li>
+                                <li><strong>v2.15 融資還本共存 (Hybrid Debt)</strong>：支援同時開啟維持率限制與到期全還，模擬更複雜的金融商品。</li>
+                                <li><strong>v2.11 混合債務修正 (Logic Fixed)</strong>：修正融資維持率分母計算，排除房貸部位影響，避免低估安全性。</li>
+                                <li><strong>v2.9 維持率機制 (Margin Call)</strong>：引入融資斷頭機制，資產低於維持率強制平倉。</li>
+                                <li><strong>v2.7 壓力測試 (Stress Test)</strong>：新增一鍵壓力測試按鈕與圖表破產標記功能。</li>
+                                <li><strong>v2.5 穩定修復 (Stable Release)</strong>：修正圖表載入異常與中位數計算邏輯，提升模擬穩定性。</li>
                             </ul>
 
                             <div className="mt-3 pt-3 border-t border-amber-200/50">
