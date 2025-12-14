@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>增貸投資壓力測試模擬器 v2.52 - 內容完整校正版</title>
+    <title>增貸投資壓力測試模擬器 v2.57 - 圖表路徑一致版</title>
     
     <!-- 1. 載入 Tailwind CSS (樣式) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -53,7 +53,7 @@
         import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
         import { createRoot } from 'react-dom/client';
         import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart, Legend, BarChart, Bar, Cell, ReferenceDot, Label } from 'recharts';
-        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink, CalendarClock, Hourglass, ArrowLeftRight, CheckCircle2, Wallet2, Maximize2, ChevronDown, ChevronUp, History, Bird, Banknote } from 'lucide-react';
+        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink, CalendarClock, Hourglass, ArrowLeftRight, CheckCircle2, Wallet2, Maximize2, ChevronDown, ChevronUp, History, Bird, Banknote, AreaChart } from 'lucide-react';
 
         // --- 數學核心函式庫 ---
 
@@ -417,7 +417,7 @@
                         <div className="flex items-center gap-2 animate-in slide-in-from-top-1 -mt-2">
                             <label className="flex items-center gap-1.5 cursor-pointer select-none">
                                 <input type="checkbox" checked={loan.repayAtMaturity || false} onChange={handleRepayAtMaturityToggle} className="w-3.5 h-3.5 rounded text-red-600 focus:ring-red-500 border-slate-300" />
-                                <span className={`text-[11px] font-bold ${loan.repayAtMaturity ? 'text-red-600' : 'text-slate-400'}`}>到期全還</span>
+                                <span className={`text-[11px] font-bold ${loan.repayAtMaturity ? 'text-red-600' : 'text-slate-400'}`}>到期全還（模擬不能續約）</span>
                             </label>
                         </div>
                     )}
@@ -445,7 +445,7 @@
         });
 
         // 自定義 Tooltip (Define before App)
-        const CustomTooltip = ({ active, payload, label }) => {
+        const CustomTooltip = ({ active, payload, label, mode }) => {
             if (active && payload && payload.length) {
                 const isSurvivalMode = payload.some(p => p.name === 'survivalLev');
                 const isCashFlowMode = payload.some(p => p.name === 'monthlyInjection'); 
@@ -474,7 +474,6 @@
                                                 <span className="font-medium text-slate-600">{displayName}</span>
                                             </div>
                                             <span className="font-mono font-bold" style={{ color: valueColor }}>
-                                                {/* FIX v2.51: Show 1 decimal place */}
                                                 {(entry.name === 'monthlyInjection' || (entry.name === 'netCashFlow' && value > 0)) ? '+' : ''}
                                                 {value.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 萬
                                             </span>
@@ -484,6 +483,38 @@
                             </div>
                         </div>
                     );
+                }
+
+                if (mode === 'drawdown') {
+                     return (
+                        <div className="bg-white p-3 border border-slate-100 shadow-xl rounded-xl text-xs z-50">
+                            <p className="font-bold text-slate-700 mb-2 border-b border-slate-100 pb-1">第 {label} 年 (回檔幅度)</p>
+                            <div className="mb-2 text-[10px] text-slate-400 font-medium">P50 (對應中位數淨值路徑)</div>
+                            <div className="space-y-1">
+                                {payload.map((entry, index) => {
+                                     if (entry.name.includes('bg') || entry.name.includes('Range')) return null;
+                                     let displayName = entry.name;
+                                     let value = entry.value;
+                                     let valueColor = entry.color;
+
+                                     if (entry.name === 'p50Lev' || entry.name === 'focusLev') { displayName = '有貸款回檔'; valueColor = '#ea580c'; }
+                                     if (entry.name === 'p50Base' || entry.name === 'focusBase') { displayName = '無貸款回檔'; valueColor = '#0ea5e9'; }
+
+                                     return (
+                                        <div key={index} className="flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: valueColor }}></span>
+                                                <span className="font-medium text-slate-600">{displayName}</span>
+                                            </div>
+                                            <span className="font-mono font-bold" style={{ color: valueColor }}>
+                                                {value.toFixed(1)}%
+                                            </span>
+                                        </div>
+                                     );
+                                })}
+                            </div>
+                        </div>
+                     );
                 }
 
                 return (
@@ -597,7 +628,12 @@
         };
 
         const versionHistory = [
-            { ver: "v2.52", title: "內容完整校正 (Content Fix)", desc: "修復了標題版本號與內容不一致的問題，確保風險提示文字完整顯示，並保留所有功能優化。" },
+            { ver: "v2.57", title: "圖表路徑一致 (Path Fix)", desc: "修正淨值、槓桿、回檔圖表邏輯，強制對照組（無貸款）取自同一個中位數平行宇宙，確保回檔波峰與市場震盪的一致性。" },
+            { ver: "v2.56", title: "路徑一致性鎖定 (Path Lock)", desc: "強制「淨值」、「槓桿」、「回檔」三張圖表的 P50 線對應同一個平行宇宙（中位數淨值路徑），並在回檔圖 Tooltip 中明確標示，確保多維度分析時的邏輯連貫性。" },
+            { ver: "v2.55", title: "專有名詞校正 (Terminology Fix)", desc: "統一風險指標名稱為「中位波動 (P50 VOL)」與「悲觀回檔 (P10 MDD)」，並修正回檔圖表標籤與 Tooltip 顯示邏輯，確保專業術語的一致性。" },
+            { ver: "v2.54", title: "深度風險解析 (Risk Insights)", desc: "新增「P50 中位波動」與「P10 悲觀回檔」兩大關鍵指標，並於表格中移除舊版標準差。評論系統也進行了重寫，針對波動率拖累與回檔心理壓力提供更精確的解讀。" },
+            { ver: "v2.53", title: "波動率與回檔分析 (Volatility & Drawdown)", desc: "新增「資產回檔 (Drawdown)」圖表與年化波動率、最大回檔數據統計，協助使用者量化槓桿帶來的心理壓力與實際風險。" },
+            { ver: "v2.52", title: "連動邏輯優化 (Sync Logic)", desc: "新增 C 貸同步啟動時自動勾選 B 貸轉貸選項的連動邏輯，並在全時序重疊時自動隱藏轉貸選項，避免邏輯矛盾。" },
             { ver: "v2.51", title: "精度優化 (Precision Tweak)", desc: "現金流 Tooltip 數值顯示精確至小數點後第一位（單位：萬），並同步優化 Y 軸刻度，提供更細膩的資金流動細節。" },
             { ver: "v2.50", title: "邏輯邊界修復 (Edge Case Fix)", desc: "修正「轉貸」與「到期還本」時間重疊時的雙重扣款 Bug。現在系統會優先執行轉貸，避免錯誤地觸發到期還款邏輯。" },
             { ver: "v2.49", title: "邏輯最終修正 (Logic Finalized)", desc: "修正多筆貸款同時啟動且借新還舊時的重複扣款問題，現在系統會智慧判斷唯一償還者，確保資產計算絕對精確。" },
@@ -750,15 +786,16 @@
             const [chartDataLev, setChartDataLev] = useState([]); 
             const [chartDataProb, setChartDataProb] = useState([]); 
             const [chartDataSurvival, setChartDataSurvival] = useState([]);
-            
+            const [chartDataDrawdown, setChartDataDrawdown] = useState([]); // New State
+
             const [auditData, setAuditData] = useState([]);
             const [selectedUniverseId, setSelectedUniverseId] = useState(null);
             const [selectedUniverseIndex, setSelectedUniverseIndex] = useState(-1);
             const [isSimulating, setIsSimulating] = useState(true);
 
             const [stats, setStats] = useState({
-                levROI: { p10: 0, p50: 0, p90: 0, stdDev: 0, irrP50: 0, p10NetWorth: 0, p50NetWorth: 0 },
-                baseROI: { p10: 0, p50: 0, p90: 0, stdDev: 0, irrP50: 0, p10NetWorth: 0, p50NetWorth: 0 },
+                levROI: { p10: 0, p50: 0, p90: 0, stdDev: 0, irrP50: 0, p10NetWorth: 0, p50NetWorth: 0, vol: 0, mdd: 0 },
+                baseROI: { p10: 0, p50: 0, p90: 0, stdDev: 0, irrP50: 0, p10NetWorth: 0, p50NetWorth: 0, vol: 0, mdd: 0 },
                 timeStats: { lev: { successRate: 0 }, base: { successRate: 0 }, integralDiff: 0 },
                 leverageAdvantage: 0,
                 totalInvested: 0,
@@ -811,8 +848,10 @@
                 if (ruinProbLev > 0) riskFactors.push({ label: "存在破產風險", val: `${ruinProbLev.toFixed(1)}%`, isBad: true });
                 if (ruinProbLev > 5) riskFactors.push({ label: "生存率極低", val: "Critical", isBad: true });
 
-                const initialLeverage = (initialCapital + totalLoanAmount) / initialCapital;
+                // NEW RISK FACTORS
+                if (levROI.mdd < -50) riskFactors.push({ label: "回檔過深", val: `${levROI.mdd.toFixed(0)}%`, isBad: true });
 
+                const initialLeverage = (initialCapital + totalLoanAmount) / initialCapital;
                 if (initialLeverage > 3.0) riskFactors.push({ label: "過度槓桿", val: `${initialLeverage.toFixed(1)}x`, isBad: true });
                 if (volatility > 25 && initialLeverage > 1.2) riskFactors.push({ label: "波動率拖累", val: "High", isBad: true });
 
@@ -1084,6 +1123,14 @@
                             const pathLevGA = new Float32Array(totalSteps + 1);
                             const pathBaseNW = new Float32Array(totalSteps + 1);
                             const pathBaseGA = new Float32Array(totalSteps + 1);
+                            
+                            // NEW: Arrays for Drawdown Calculation
+                            const pathLevDD = new Float32Array(totalSteps + 1);
+                            const pathBaseDD = new Float32Array(totalSteps + 1);
+                            
+                            let runningMaxLev = -Infinity;
+                            let runningMaxBase = -Infinity;
+
 
                             // Initial State
                             let currentGrossAsset = Number(initialCapital) + injectionSchedule[0] - payoffSchedule[0]; 
@@ -1095,6 +1142,12 @@
                             pathLevGA[0] = currentGrossAsset;
                             pathBaseNW[0] = currentBaseAsset;
                             pathBaseGA[0] = currentBaseAsset;
+                            
+                            // Init Drawdown
+                            runningMaxLev = Math.max(runningMaxLev, pathLevNW[0]);
+                            runningMaxBase = Math.max(runningMaxBase, pathBaseNW[0]);
+                            pathLevDD[0] = (pathLevNW[0] - runningMaxLev) / runningMaxLev * 100;
+                            pathBaseDD[0] = (pathBaseNW[0] - runningMaxBase) / runningMaxBase * 100;
 
                             if (pathLevGA[0] > 0) survivalCountsLev[0]++;
                             if (pathBaseGA[0] > 0) survivalCountsBase[0]++;
@@ -1127,7 +1180,7 @@
                                     currentGrossAsset += marketGrowthLev;
                                     currentGrossAsset += (currentMonthlyInjection - schedule.totalPayment);
                                     
-                                    // Handle Injections & Payoffs at START of next month (t+1)
+                                    // Handle Injections & Payoffs
                                     if (t + 1 < injectionSchedule.length) {
                                         const inject = injectionSchedule[t+1];
                                         const payoff = payoffSchedule[t+1];
@@ -1135,7 +1188,6 @@
                                         currentGrossAsset += (inject - payoff);
                                         currentTotalLoanBalance += (inject - payoff);
                                         
-                                        // Margin adjustments
                                         const mInject = marginInjectionSchedule[t+1];
                                         const mPayoff = marginPayoffSchedule[t+1];
                                         currentMarginDebt += (mInject - mPayoff);
@@ -1143,7 +1195,7 @@
 
                                     currentTotalLoanBalance -= schedule.totalPrincipalRed;
                                     
-                                    // Handle Repayment at Maturity (Balloon Payment)
+                                    // Handle Repayment at Maturity
                                     if (repaymentSchedule[t+1] > 0) {
                                         const repaymentAmount = repaymentSchedule[t+1];
                                         currentGrossAsset -= repaymentAmount;
@@ -1171,10 +1223,6 @@
                                         for (const loan of loans) {
                                             const loanStartMonth = (loan.startYear || 0) * 12;
                                             const isLoanActive = (t + 1) > loanStartMonth; 
-                                            // Simplification: We check if `t+1` is < paidOffMonth (if paid off).
-                                            const lState = loanState.find(s => s.id === loan.id);
-                                            // If paidOffMonth is null, it's never paid off (or active until end). 
-                                            // If it has value, check time.
                                             const cutoffData = loanCutoffs[loan.id];
                                             const isPaidOff = cutoffData !== undefined && (t+1) >= cutoffData.month;
 
@@ -1195,6 +1243,14 @@
                                 }
                                 
                                 if (!hasGoneBust) survivalCountsLev[t+1]++;
+                                
+                                // Calc Drawdown (Lev)
+                                if(!hasGoneBust) {
+                                    runningMaxLev = Math.max(runningMaxLev, pathLevNW[t+1]);
+                                    pathLevDD[t+1] = (pathLevNW[t+1] - runningMaxLev) / runningMaxLev * 100;
+                                } else {
+                                    pathLevDD[t+1] = -100;
+                                }
 
                                 // Base
                                 let marketGrowthBase = 0;
@@ -1205,6 +1261,10 @@
                                 pathBaseNW[t+1] = currentBaseAsset;
                                 pathBaseGA[t+1] = currentBaseAsset;
                                 if (currentBaseAsset > 0) survivalCountsBase[t+1]++;
+                                
+                                // Calc Drawdown (Base)
+                                runningMaxBase = Math.max(runningMaxBase, currentBaseAsset);
+                                pathBaseDD[t+1] = (currentBaseAsset - runningMaxBase) / runningMaxBase * 100;
 
                                 if (hitTargetLev === null && !hasGoneBust && pathLevNW[t+1] >= targetAmt) hitTargetLev = (t+1)/12;
                                 if (hitTargetBase === null && currentBaseAsset >= targetAmt) hitTargetBase = (t+1)/12;
@@ -1218,11 +1278,37 @@
                                 if (finalLevNet > (finalBaseNet + EPSILON) && !hasGoneBust) winner = 'lev';
                                 else if (finalBaseNet > (finalLevNet + EPSILON)) winner = 'base';
                             } else { }
+                            
+                            // Calc Volatility
+                            const calculatePathVol = (path) => {
+                                const returns = [];
+                                for(let k=1; k<=totalSteps; k++) {
+                                    if(path[k-1] > 0 && path[k] > 0) {
+                                        returns.push(Math.log(path[k] / path[k-1]));
+                                    }
+                                }
+                                if(returns.length < 2) return 0;
+                                const meanR = returns.reduce((a,b)=>a+b,0)/returns.length;
+                                const varR = returns.reduce((a,b)=>a+Math.pow(b-meanR,2),0)/(returns.length-1);
+                                return Math.sqrt(varR) * Math.sqrt(12) * 100;
+                            };
+                            
+                            const volLev = hasGoneBust ? 0 : calculatePathVol(pathLevNW);
+                            const volBase = calculatePathVol(pathBaseNW);
+                            
+                            // Calc Max Drawdown for this path
+                            let minDDLev = 0;
+                            let minDDBase = 0;
+                            for(let k=0; k<=totalSteps; k++) {
+                                if(pathLevDD[k] < minDDLev) minDDLev = pathLevDD[k];
+                                if(pathBaseDD[k] < minDDBase) minDDBase = pathBaseDD[k];
+                            }
 
                             allUniverses.push({
                                 id: i + 1,
                                 pathLevNW, pathLevGA,
                                 pathBaseNW, pathBaseGA,
+                                pathLevDD, pathBaseDD, // Store Drawdown Paths
                                 finalLevNet, finalBaseNet,
                                 levROI: ((finalLevNet - finalTotalInvested) / finalTotalInvested) * 100,
                                 baseROI: ((finalBaseNet - finalTotalInvested) / finalTotalInvested) * 100,
@@ -1232,7 +1318,9 @@
                                 winner,
                                 alpha: finalLevNet - finalBaseNet,
                                 hitTargetLev,
-                                hitTargetBase
+                                hitTargetBase,
+                                volLev, volBase,
+                                mddLev: minDDLev, mddBase: minDDBase
                             });
                         }
 
@@ -1256,6 +1344,11 @@
                     
                     const sortedLevNet = [...allUniverses].map(r => r.finalLevNet).sort((a, b) => a - b);
                     const sortedBaseNet = [...allUniverses].map(r => r.finalBaseNet).sort((a, b) => a - b);
+                    
+                    // Stats for Volatility and MDD
+                    const sortedVolLev = [...allUniverses].filter(u => !u.isZombie).map(u => u.volLev).sort((a,b)=>a-b);
+                    const sortedVolBase = [...allUniverses].map(u => u.volBase).sort((a,b)=>a-b);
+                    const sortedMDDLev = [...allUniverses].map(u => u.mddLev).sort((a,b)=>a-b); 
 
                     const getStats = (arr) => {
                         const valid = arr.filter(x => x !== null).sort((a,b) => a-b);
@@ -1294,7 +1387,9 @@
                         stdDev: calculateStdDev(sortedLevROIs),
                         p10NetWorth: sortedLevNet[Math.floor(simulationCount * 0.1)],
                         p90NetWorth: sortedLevNet[Math.floor(simulationCount * 0.9)],
-                        p50NetWorth: sortedLevNet[Math.floor(simulationCount * 0.5)]
+                        p50NetWorth: sortedLevNet[Math.floor(simulationCount * 0.5)],
+                        vol: sortedVolLev[Math.floor(sortedVolLev.length * 0.5)] || 0, // Median Vol
+                        mdd: sortedMDDLev[Math.floor(simulationCount * 0.1)] || -100 // P10 Worst Drawdown
                     };
                     
                     const p50LevFinal = sortedLevNet[Math.floor(simulationCount*0.5)];
@@ -1307,7 +1402,9 @@
                         stdDev: calculateStdDev(sortedBaseROIs),
                         p10NetWorth: sortedBaseNet[Math.floor(simulationCount * 0.1)],
                         p90NetWorth: sortedBaseNet[Math.floor(simulationCount * 0.9)],
-                        p50NetWorth: sortedBaseNet[Math.floor(simulationCount * 0.5)]
+                        p50NetWorth: sortedBaseNet[Math.floor(simulationCount * 0.5)],
+                        vol: sortedVolBase[Math.floor(simulationCount * 0.5)] || 0,
+                        mdd: sortedVolBase.length > 0 ? [...allUniverses].map(u=>u.mddBase).sort((a,b)=>a-b)[Math.floor(simulationCount * 0.1)] : 0
                     };
                     const p50BaseFinal = sortedBaseNet[Math.floor(simulationCount*0.5)];
                     baseStats.irrP50 = calculateIRR(initialCapital, Number(monthlySavings), Number(savingsGrowthRate), years, p50BaseFinal);
@@ -1342,8 +1439,9 @@
                         const stats = [];
                         const sortedByLevFinal = [...allUniverses].sort((a, b) => a.finalLevNet - b.finalLevNet);
                         const medianLevUniverse = sortedByLevFinal[Math.floor(simulationCount * 0.5)] || sortedByLevFinal[0]; 
-                        const sortedByBaseFinal = [...allUniverses].sort((a, b) => a.finalBaseNet - b.finalBaseNet);
-                        const medianBaseUniverse = sortedByBaseFinal[Math.floor(simulationCount * 0.5)] || sortedByBaseFinal[0];
+                        
+                        // We will use the SAME universe for Base comparison in charts to ensure consistency
+                        const comparisonBaseUniverse = medianLevUniverse;
 
                         for(let t=0; t <= totalSteps; t++) {
                             let p50Lev, p50Base;
@@ -1364,13 +1462,18 @@
                                 p50Base = probBase;
                             } else if (type === 'NW') {
                                 p50Lev = medianLevUniverse ? medianLevUniverse.pathLevNW[t] : 0;
-                                p50Base = medianBaseUniverse ? medianBaseUniverse.pathBaseNW[t] : 0;
+                                p50Base = comparisonBaseUniverse ? comparisonBaseUniverse.pathBaseNW[t] : 0; // Changed
+                            } else if (type === 'DRAWDOWN') { 
+                                p50Lev = medianLevUniverse ? medianLevUniverse.pathLevDD[t] : 0;
+                                p50Base = comparisonBaseUniverse ? comparisonBaseUniverse.pathBaseDD[t] : 0; // Changed
                             } else {
+                                // Leverage Chart
                                 const levNW = medianLevUniverse ? medianLevUniverse.pathLevNW[t] : 0;
                                 const levGA = medianLevUniverse ? medianLevUniverse.pathLevGA[t] : 0;
                                 p50Lev = levNW <= 0 ? 999 : levGA / levNW;
-                                const baseNW = medianBaseUniverse ? medianBaseUniverse.pathBaseNW[t] : 0;
-                                const baseGA = medianBaseUniverse ? medianBaseUniverse.pathBaseGA[t] : 0;
+
+                                const baseNW = comparisonBaseUniverse ? comparisonBaseUniverse.pathBaseNW[t] : 0; // Changed
+                                const baseGA = comparisonBaseUniverse ? comparisonBaseUniverse.pathBaseGA[t] : 0; // Changed
                                 p50Base = baseNW <= 0 ? 999 : baseGA / baseNW;
                             }
 
@@ -1389,6 +1492,9 @@
                                     if (type === 'NW') {
                                         point[`lev_bg_${i}`] = u.pathLevNW[t];
                                         point[`base_bg_${i}`] = u.pathBaseNW[t];
+                                    } else if (type === 'DRAWDOWN') {
+                                        point[`lev_bg_${i}`] = u.pathLevDD[t];
+                                        point[`base_bg_${i}`] = u.pathBaseDD[t];
                                     } else {
                                         point[`lev_bg_${i}`] = u.pathLevNW[t] <= 0 ? 999 : u.pathLevGA[t] / u.pathLevNW[t];
                                         point[`base_bg_${i}`] = u.pathBaseNW[t] <= 0 ? 999 : u.pathBaseGA[t] / u.pathBaseNW[t];
@@ -1404,11 +1510,13 @@
                     const levData = processChartData('LEV'); 
                     const probData = processChartData('PROB');
                     const survivalData = processChartData('SURVIVAL');
+                    const drawdownData = processChartData('DRAWDOWN');
 
                     setChartDataNW(nwData);
                     setChartDataLev(levData); 
                     setChartDataProb(probData);
                     setChartDataSurvival(survivalData);
+                    setChartDataDrawdown(drawdownData);
 
                     setStats({ 
                         levROI: levStats, baseROI: baseStats, leverageAdvantage: advProb, totalInvested: finalTotalInvested, isIdentical, avgLoanRate, 
@@ -1429,17 +1537,11 @@
                      return Math.min(dataMax * 1.1, 5); 
                 }];
             } else if (viewMode === 'netWorth' && stats.levROI.p90NetWorth) {
-                // Heuristic: Limit net worth y-axis to a bit above the P90 result to prevent lucky outliers from squashing the chart
-                // If P90 is very small or negative (bust), fallback to initial capital * growth
                 const maxP90 = Math.max(stats.levROI.p90NetWorth, stats.baseROI.p90NetWorth || 0);
-                // Also consider the target amount to ensure target line is visible
                 const ceiling = Math.max(maxP90 * 1.2, targetAmount * 1.1, initialCapital * 1.5);
                 yAxisDomain = [
                     'auto', 
                     (dataMax) => {
-                        // Avoid extreme outliers compressing the view
-                        // Threshold: 1.5x of the P90 outcome or Target Amount
-                        // FIX v2.31: Ensure maxP90 exists and fallback
                         const threshold = Math.max((maxP90 || 0) * 1.2, targetAmount * 1.1);
                         return Math.min(dataMax || 0, threshold); 
                     }
@@ -1458,6 +1560,7 @@
                 if (viewMode === 'survival') baseData = chartDataSurvival;
                 else if (viewMode === 'netWorth') baseData = chartDataNW;
                 else if (viewMode === 'leverage') baseData = chartDataLev;
+                else if (viewMode === 'drawdown') baseData = chartDataDrawdown;
                 else baseData = chartDataProb;
 
                 if (!baseData || baseData.length === 0) return [];
@@ -1472,11 +1575,17 @@
                             const pLevGA = target.pathLevGA[t];
                             const pBaseNW = target.pathBaseNW[t];
                             const pBaseGA = target.pathBaseGA[t];
+                            
+                            const pLevDD = target.pathLevDD ? target.pathLevDD[t] : 0;
+                            const pBaseDD = target.pathBaseDD ? target.pathBaseDD[t] : 0;
 
                             let focusLevVal, focusBaseVal;
                             if (viewMode === 'netWorth') {
                                 focusLevVal = pLevNW;
                                 focusBaseVal = pBaseNW;
+                            } else if (viewMode === 'drawdown') {
+                                focusLevVal = pLevDD;
+                                focusBaseVal = pBaseDD;
                             } else {
                                 focusLevVal = pLevNW <= 0 ? 999 : pLevGA / pLevNW;
                                 focusBaseVal = pBaseNW <= 0 ? 999 : pBaseGA / pBaseNW;
@@ -1486,7 +1595,7 @@
                     }
                 }
                 return baseData;
-            }, [selectedUniverseId, chartDataNW, chartDataLev, chartDataProb, chartDataSurvival, simResults, viewMode, chartDataCashFlow, isSimulating]);
+            }, [selectedUniverseId, chartDataNW, chartDataLev, chartDataProb, chartDataSurvival, chartDataDrawdown, simResults, viewMode, chartDataCashFlow, isSimulating]);
 
             const handleSliderChange = (rank) => {
                 if (!stats.sortedIndices || stats.sortedIndices.length === 0) return;
@@ -1630,7 +1739,8 @@
                                                 <th className="px-5 py-3 text-emerald-600 whitespace-nowrap">樂觀情境 <br/> <div className="text-[10px] opacity-80 font-normal">(UPSIDE, P90)</div></th>
                                                 <th className="px-5 py-3 text-indigo-600 whitespace-nowrap">中位情境 <br/> <div className="text-[10px] opacity-80 font-normal">(MEDIAN, P50)</div></th>
                                                 <th className="px-5 py-3 text-red-600 whitespace-nowrap">悲觀情境 <br/> <div className="text-[10px] opacity-80 font-normal">(DOWNSIDE, P10)</div></th>
-                                                <th className="px-5 py-3 text-slate-600 whitespace-nowrap">波動風險 <br/> <div className="text-[10px] opacity-80 font-normal">(STD DEV)</div></th>
+                                                <th className="px-5 py-3 text-slate-600 whitespace-nowrap border-l border-slate-100">中位波動 <br/> <div className="text-[10px] opacity-80 font-normal">(P50 VOL)</div></th>
+                                                <th className="px-5 py-3 text-slate-600 whitespace-nowrap">悲觀回檔 <br/> <div className="text-[10px] opacity-80 font-normal">(P10 MDD)</div></th>
                                                 <th className="px-5 py-3 text-slate-700 border-l border-slate-100 whitespace-nowrap">中位年化 <br/> <div className="text-[10px] opacity-80 font-normal">(IRR)</div></th>
                                             </tr>
                                         </thead>
@@ -1640,7 +1750,8 @@
                                                 <td className="px-5 py-4 font-medium text-emerald-600 text-sm tabular-nums">{formatPercent(stats.levROI.p90)}</td>
                                                 <td className="px-5 py-4 font-medium text-indigo-700 text-sm tabular-nums">{formatPercent(stats.levROI.p50)}</td>
                                                 <td className="px-5 py-4 font-medium text-red-600 text-sm tabular-nums">{formatPercent(stats.levROI.p10)}</td>
-                                                <td className="px-5 py-4 font-medium text-slate-500 text-sm tabular-nums">{stats.levROI.stdDev.toFixed(1)}%</td>
+                                                <td className="px-5 py-4 font-medium text-slate-500 text-sm tabular-nums border-l border-slate-100">{stats.levROI.vol.toFixed(1)}%</td>
+                                                <td className="px-5 py-4 font-bold text-red-500 text-sm tabular-nums">{stats.levROI.mdd.toFixed(1)}%</td>
                                                 <td className="px-5 py-4 font-medium text-slate-700 border-l border-slate-100 text-sm tabular-nums">{formatPercent(stats.levROI.irrP50)}</td>
                                             </tr>
                                             <tr className="bg-sky-50/10 hover:bg-sky-50/30 transition-colors">
@@ -1648,7 +1759,8 @@
                                                 <td className="px-5 py-4 font-medium text-emerald-600/80 text-sm tabular-nums">{formatPercent(stats.baseROI.p90)}</td>
                                                 <td className="px-5 py-4 font-medium text-indigo-700 text-sm tabular-nums">{formatPercent(stats.baseROI.p50)}</td>
                                                 <td className="px-5 py-4 font-medium text-red-600/80 text-sm tabular-nums">{formatPercent(stats.baseROI.p10)}</td>
-                                                <td className="px-5 py-4 font-medium text-slate-400 text-sm tabular-nums">{stats.baseROI.stdDev.toFixed(1)}%</td>
+                                                <td className="px-5 py-4 font-medium text-slate-400 text-sm tabular-nums border-l border-slate-100">{stats.baseROI.vol.toFixed(1)}%</td>
+                                                <td className="px-5 py-4 font-medium text-slate-400 text-sm tabular-nums">{stats.baseROI.mdd.toFixed(1)}%</td>
                                                 <td className="px-5 py-4 font-medium text-slate-600 border-l border-slate-100 text-sm tabular-nums">{formatPercent(stats.baseROI.irrP50)}</td>
                                             </tr>
                                         </tbody>
@@ -1657,7 +1769,7 @@
                             </div>
                         </div>
 
-                    <div className={`rounded-2xl p-5 border shadow-sm transition-all duration-300 mt-6 ${cashFlowStatus.hasNegativeFlow ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                        <div className={`rounded-2xl p-5 border shadow-sm transition-all duration-300 mt-6 ${cashFlowStatus.hasNegativeFlow ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
                         <div className="flex items-start gap-4">
                             <div className={`p-2.5 rounded-full border shadow-sm shrink-0 ${cashFlowStatus.hasNegativeFlow ? 'bg-white border-red-100 text-red-600' : 'bg-white border-green-100 text-green-600'}`}>
                                 {cashFlowStatus.hasNegativeFlow ? <AlertOctagon className="w-6 h-6" /> : <ShieldCheck className="w-6 h-6" />}
@@ -1700,10 +1812,10 @@
                                 </h2>
                                 
                                 {selectedUniverseId === null && viewMode === 'survival' && <p className="text-xs text-red-500 mt-1 font-bold">檢視策略的死亡風險：曲線越陡峭，代表破產歸零的機率越高</p>}
-                                {selectedUniverseId === null && viewMode !== 'targetProb' && viewMode !== 'survival' && viewMode !== 'cashFlow' && <p className="text-xs text-slate-400 mt-1 font-medium">隨機呈現 50 條市場路徑，展示真實的波動風險 (暖色=有貸, 冷色=無貸)</p>}
+                                {selectedUniverseId === null && viewMode !== 'targetProb' && viewMode !== 'survival' && viewMode !== 'cashFlow' && viewMode !== 'drawdown' && <p className="text-xs text-slate-400 mt-1 font-medium">隨機呈現 50 條市場路徑，展示真實的波動風險 (暖色=有貸, 冷色=無貸)</p>}
                                 {viewMode === 'targetProb' && <p className="text-xs text-slate-400 mt-1 font-medium">顯示有多少比例的平行宇宙在特定時間點前已達成 {targetAmount} 萬目標</p>}
                                 {viewMode === 'cashFlow' && <p className="text-xs text-slate-400 mt-1 font-medium">分析每個月的資金流入(儲蓄)與流出(還款)，正值為安全區間，負值需變賣資產</p>}
-
+                                {viewMode === 'drawdown' && <p className="text-xs text-slate-400 mt-1 font-medium">顯示資產從歷史高點下跌的百分比。曲線越深，代表承受的心理壓力越大。</p>}
                             </div>
                             <div className="flex items-center gap-2">
                                 {selectedUniverseId === null ? (
@@ -1711,6 +1823,7 @@
                                         <button onClick={() => setViewMode('netWorth')} className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'netWorth' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}> <Eye size={14} /> 淨值 </button>
                                         <button onClick={() => setViewMode('leverage')} className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'leverage' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}> <Scale size={14} /> 槓桿 </button>
                                         <button onClick={() => setViewMode('cashFlow')} className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'cashFlow' ? 'bg-white text-teal-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}> <Banknote size={14} /> 現金流 </button>
+                                        <button onClick={() => setViewMode('drawdown')} className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'drawdown' ? 'bg-white text-purple-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}> <TrendingDown size={14} /> 回檔 </button>
                                         <button onClick={() => setViewMode('targetProb')} className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'targetProb' ? 'bg-white text-rose-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}> <Target size={14} /> 達標機率 </button>
                                         <button onClick={() => setViewMode('survival')} className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'survival' ? 'bg-white text-red-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}> <HeartPulse size={14} /> 生存率 </button>
                                     </div>
@@ -1731,6 +1844,12 @@
                             ) : (
                                 <ResponsiveContainer width="100%" height={400}>
                                     <ComposedChart data={displayData} margin={{ top: 20, right: 30, left: 50, bottom: 20 }}>
+                                    <defs>
+                                        <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
+                                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0.8}/>
+                                        </linearGradient>
+                                    </defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                     <XAxis 
                                         dataKey="year" 
@@ -1749,16 +1868,17 @@
                                         tickFormatter={(val) => {
                                             if (viewMode === 'targetProb' || viewMode === 'survival') return `${val}%`;
                                             if (viewMode === 'leverage') return `${val}x`;
+                                            if (viewMode === 'drawdown') return `${val.toFixed(0)}%`;
                                             if (viewMode === 'cashFlow') return val.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
                                             return val > 10000 || val < -10000 ? (val/10000).toFixed(1)+'億' : val.toLocaleString();
                                         }} 
-                                        label={{ value: viewMode === 'netWorth' ? '淨值 (萬)' : (viewMode === 'survival' ? '生存機率 (%)' : (viewMode === 'leverage' ? '槓桿倍數 (x)' : (viewMode === 'cashFlow' ? '金額 (萬)' : '達標機率 (%)'))), angle: -90, position: 'insideLeft', offset: -5, style: { textAnchor: 'middle', fontSize: 11, fill: '#64748b' } }} 
+                                        label={{ value: viewMode === 'netWorth' ? '淨值 (萬)' : (viewMode === 'survival' ? '生存機率 (%)' : (viewMode === 'leverage' ? '槓桿倍數 (x)' : (viewMode === 'cashFlow' ? '金額 (萬)' : (viewMode === 'drawdown' ? '淨值回檔幅度 (%)' : '達標機率 (%)')))), angle: -90, position: 'insideLeft', offset: -5, style: { textAnchor: 'middle', fontSize: 11, fill: '#64748b' } }} 
                                         tickLine={false} 
                                         axisLine={false} 
                                         domain={yAxisDomain}
                                     />
                                     <Tooltip 
-                                        content={ <CustomTooltip /> }
+                                        content={ <CustomTooltip mode={viewMode} /> }
                                         cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '4 4' }}
                                     />
                                     <Legend 
@@ -1774,7 +1894,15 @@
                                             (viewMode === 'targetProb' || viewMode === 'survival') ? [
                                                 { value: viewMode === 'survival' ? '生存率 (有貸款)' : '達標機率 (有貸款)', type: 'line', color: viewMode === 'survival' ? "#dc2626" : "#ea580c", id: 'probLev' }, 
                                                 { value: viewMode === 'survival' ? '生存率 (無貸款)' : '達標機率 (無貸款)', type: 'line', color: "#0ea5e9", id: 'probBase' }, 
-                                            ] : (selectedUniverseId !== null ? [
+                                            ] : 
+                                            viewMode === 'drawdown' ? (selectedUniverseId !== null ? [
+                                                { value: '該宇宙-有貸款', type: 'line', color: "#ea580c", id: 'leveraged' },
+                                                { value: '該宇宙-無貸款', type: 'line', color: "#0ea5e9", id: 'noLoan' }
+                                            ] : [
+                                                 { value: '有貸款 (P50)', type: 'line', color: "#ea580c", id: 'leveraged' },
+                                                 { value: '無貸款 (P50)', type: 'line', color: "#0ea5e9", id: 'noLoan' }
+                                            ]) :
+                                            (selectedUniverseId !== null ? [
                                                 { value: '該宇宙-有貸款', type: 'line', color: "#ea580c", id: 'leveraged' }, 
                                                 { value: '該宇宙-無貸款', type: 'line', color: "#0ea5e9", id: 'noLoan' }, 
                                             ] : [ 
@@ -1804,7 +1932,7 @@
                                         </ReferenceDot>
                                     )}
 
-                                    {selectedUniverseId === null && (viewMode === 'netWorth' || viewMode === 'leverage') && (
+                                    {selectedUniverseId === null && (viewMode === 'netWorth' || viewMode === 'leverage' || viewMode === 'drawdown') && (
                                         <>
                                             {visibleSeries.leveraged && Array.from({ length: 50 }).map((_, i) => ( <Line key={`lev_bg_${i}`} type="monotone" dataKey={`lev_bg_${i}`} stroke="#f97316" strokeWidth={1} dot={false} strokeOpacity={0.12} isAnimationActive={false} /> ))}
                                             {visibleSeries.noLoan && Array.from({ length: 50 }).map((_, i) => ( <Line key={`base_bg_${i}`} type="monotone" dataKey={`base_bg_${i}`} stroke="#0ea5e9" strokeWidth={1} dot={false} strokeOpacity={0.12} isAnimationActive={false} /> ))}
@@ -1814,7 +1942,7 @@
                                         </>
                                     )}
 
-                                    {selectedUniverseId !== null && (viewMode === 'netWorth' || viewMode === 'leverage') && (
+                                    {selectedUniverseId !== null && (viewMode === 'netWorth' || viewMode === 'leverage' || viewMode === 'drawdown') && (
                                         <>
                                             {visibleSeries.leveraged && <Line type="monotone" dataKey="focusLev" stroke={simResults[selectedUniverseId-1]?.isZombie ? "#dc2626" : "#ea580c"} strokeWidth={3} dot={false} name="focusLev" animationDuration={500} />}
                                             {visibleSeries.noLoan && <Line type="monotone" dataKey="focusBase" stroke="#0ea5e9" strokeWidth={3} dot={false} name="focusBase" animationDuration={500} />}
@@ -1980,7 +2108,8 @@
                             <h4 className="text-sm font-bold text-amber-900 mb-2">模型限制與校正提醒 (Model Disclaimers)</h4>
                             
                             <ul className="text-xs text-amber-800 space-y-1.5 list-disc list-inside opacity-90">
-                                <li><strong>v2.52 連動邏輯優化 (Sync Logic)</strong>：新增 C 貸同步啟動時自動勾選 B 貸轉貸選項的連動邏輯，並在全時序重疊時自動隱藏轉貸選項，避免邏輯矛盾。</li>
+                                <li><strong>v2.55 專有名詞校正 (Terminology Fix)</strong>：統一風險指標名稱為「中位波動 (P50 VOL)」與「悲觀回檔 (P10 MDD)」，並修正回檔圖表標籤與 Tooltip 顯示邏輯，確保專業術語的一致性。</li>
+                                <li><strong>v2.54 深度風險解析 (Risk Insights)</strong>：新增「P50 中位波動」與「P10 悲觀回檔」兩大關鍵指標，並於表格中移除舊版標準差。</li>
                                 <li><strong>混合情境 (Hybrid Complexity)</strong>：支援同時模擬「房貸（不斷頭）」、「融資（會斷頭）」與「到期一次還本」的複雜債務組合。</li>
                                 <li><strong>流動性是唯一死穴 (Liquidity is King)</strong>：對於未啟用維持率限制的貸款（如房貸），唯一會導致破產的原因是「繳不出貸款」。請務必關注左側的「現金流警示」儀表板。</li>
                                 <li><strong>負資產心理壓力 (Psychological Pressure)</strong>：雖然房貸模式允許淨值為負（水下），但現實中看著資產負債表赤字需要極強的心理素質，請勿忽視心理帳戶的影響。</li>
