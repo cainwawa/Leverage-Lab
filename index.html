@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>增貸投資壓力測試模擬器 v2.23 - 智能防呆版</title>
+    <title>增貸投資壓力測試模擬器 v2.26 - 時序邏輯重構版</title>
     
     <!-- 1. 載入 Tailwind CSS (樣式) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -38,7 +38,7 @@
         import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
         import { createRoot } from 'react-dom/client';
         import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart, Legend, BarChart, Bar, Cell, ReferenceDot, Label } from 'recharts';
-        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink, CalendarClock, Hourglass, ArrowLeftRight, CheckCircle2 } from 'lucide-react';
+        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink, CalendarClock, Hourglass, ArrowLeftRight, CheckCircle2, Wallet2 } from 'lucide-react';
 
         // --- 數學核心函式庫 ---
 
@@ -76,6 +76,32 @@
             return ((low + high) / 2) * 100;
         };
 
+        // Standalone helper for balance calculation
+        const getEstimatedBalance = (loan, monthIdx) => {
+            if (loan.amount <= 0) return 0;
+            const startMonth = loan.startYear * 12;
+            if (monthIdx < startMonth) return 0; 
+            
+            const n_months_passed = monthIdx - startMonth;
+            if (n_months_passed > loan.years * 12) return 0; 
+            
+            const graceMonths = loan.grace * 12;
+            if (n_months_passed <= graceMonths) return loan.amount;
+            
+            const monthlyRate = loan.rate / 100 / 12;
+            const totalLoanMonths = loan.years * 12;
+            const amortizationMonths = totalLoanMonths - graceMonths;
+            const monthsIntoAmortization = n_months_passed - graceMonths;
+            
+            if (monthlyRate === 0) {
+                return loan.amount * (1 - monthsIntoAmortization / amortizationMonths);
+            }
+            
+            const numerator = Math.pow(1 + monthlyRate, amortizationMonths) - Math.pow(1 + monthlyRate, monthsIntoAmortization);
+            const denominator = Math.pow(1 + monthlyRate, amortizationMonths) - 1;
+            return loan.amount * (numerator / denominator);
+        };
+
         const calculateLoanSchedule = (loan, totalMonths) => {
             const { amount, years, rate, grace, startYear = 0 } = loan;
             const schedule = new Array(totalMonths).fill({ payment: 0, principal: 0, interest: 0, balance: 0 });
@@ -89,10 +115,9 @@
             
             let currentBalance = amount;
             
-            // Loop through "loan life" months
             for (let i = 1; i <= loanMonths; i++) {
                 const targetIdx = startMonthIdx + i - 1;
-                if (targetIdx >= totalMonths) break; // Exceeds simulation time
+                if (targetIdx >= totalMonths) break; 
 
                 let payment = 0, interest = currentBalance * monthlyRate, principal = 0;
                 
@@ -106,7 +131,7 @@
                         payment = principal; 
                         interest = 0; 
                     } else { 
-                        const pmt = amount * (monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n)) - 1; 
+                        const pmt = amount * (monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1); 
                         payment = pmt; 
                         principal = payment - interest; 
                     }
@@ -189,27 +214,59 @@
                 onUpdate(loan.id, 'repayAtMaturity', e.target.checked);
             };
             
-            // Logic for Refinance Visibility (Smart Logic v2.23)
-            // Can refinance if: Start time > Prev Start time AND Start time <= Prev End time
-            const canRefinanceA = loan.id === 2 && 
-                                  allLoans[0].startYear < loan.startYear && 
-                                  loan.startYear <= (allLoans[0].startYear + allLoans[0].years);
+            // Logic for Refinance Visibility (v2.26 Smart Logic)
+            // Loan can refinance IF there is any previous loan that started BEFORE this loan.
+            // AND that previous loan is still active (theoretically) at this loan's start time? 
+            // Actually, simply checking start time is enough, the engine handles if it's already dead.
+            // But we want to show sensible text.
             
-            // For C refinancing A and B, we simplify: can refinance if it starts later than at least one AND within the valid window of at least one
-            const canRefinancePrev = loan.id === 3 && (
-                (allLoans[0].startYear < loan.startYear && loan.startYear <= (allLoans[0].startYear + allLoans[0].years)) || 
-                (allLoans[1].startYear < loan.startYear && loan.startYear <= (allLoans[1].startYear + allLoans[1].years))
-            );
+            let refinancableTargets = [];
+            if (loan.id === 2) { // B can refi A
+                if (allLoans[0].startYear < loan.startYear) refinancableTargets.push("貸款A");
+            }
+            if (loan.id === 3) { // C can refi A and/or B
+                if (allLoans[0].startYear < loan.startYear) refinancableTargets.push("A");
+                if (allLoans[1].startYear < loan.startYear) refinancableTargets.push("B");
+            }
+            
+            const canRefinance = refinancableTargets.length > 0;
 
-            // Determine Label Text
-            const getRefinanceLabel = () => {
-                if (loan.id === 2) {
-                    const diff = (allLoans[0].startYear + allLoans[0].years) - loan.startYear;
-                    if (diff === 0) return "(無縫轉貸)";
-                    return "(提前清償)";
+            // Calculate estimated deficiency for UI warning (Corrected Logic v2.25)
+            const getDeficiencyWarning = () => {
+                if (!loan.refinancePrevious) return null;
+                const currentStartMonth = loan.startYear * 12;
+                let estimatedPrevDebt = 0;
+
+                // Logic for Loan B
+                if (loan.id === 2 && canRefinance) {
+                    estimatedPrevDebt += getEstimatedBalance(allLoans[0], currentStartMonth);
                 }
-                return "";
+
+                // Logic for Loan C
+                if (loan.id === 3) {
+                     // Check A
+                     if (allLoans[0].startYear < loan.startYear) {
+                         // Heuristic: If B started before C, and B refinanced A, then A is likely gone.
+                         // But we can't be 100% sure without running sim. 
+                         // For UI estimation, we assume sequential perfection if checked.
+                         const bRefinancedA = allLoans[1].refinancePrevious && allLoans[1].startYear < loan.startYear && allLoans[1].startYear > allLoans[0].startYear;
+                         if (!bRefinancedA) {
+                             estimatedPrevDebt += getEstimatedBalance(allLoans[0], currentStartMonth);
+                         }
+                     }
+                     // Check B
+                     if (allLoans[1].startYear < loan.startYear) {
+                         estimatedPrevDebt += getEstimatedBalance(allLoans[1], currentStartMonth);
+                     }
+                }
+                
+                if (loan.amount < estimatedPrevDebt - 1) { 
+                    return `⚠️ 金額不足覆蓋前債！餘額 ${Math.round(estimatedPrevDebt)}萬 > 新貸 ${loan.amount}萬，差額由資產支付 (變相減資)`;
+                }
+                return null;
             };
+
+            const deficiencyMsg = getDeficiencyWarning();
             
             const handleRefinanceToggle = (e) => {
                 onUpdate(loan.id, 'refinancePrevious', e.target.checked);
@@ -226,7 +283,7 @@
                         <span className="font-bold text-sm text-slate-700 block mb-1 flex items-center gap-2">
                             {loan.name}
                             {loan.startYear > 0 && <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 rounded-sm font-normal">T+{loan.startYear}</span>}
-                            {loan.refinancePrevious && (canRefinanceA || canRefinancePrev) && <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 rounded-sm font-normal flex items-center gap-0.5"><ArrowLeftRight size={8}/>借新還舊</span>}
+                            {loan.refinancePrevious && canRefinance && <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 rounded-sm font-normal flex items-center gap-0.5"><ArrowLeftRight size={8}/>借新還舊</span>}
                         </span>
                         <div className="flex flex-col gap-1">
                         {loan.amount > 0 ? (
@@ -283,12 +340,21 @@
                     </div>
                     
                     {/* Refinance Checkbox - Smart Visibility */}
-                    {(canRefinanceA || canRefinancePrev) && (
-                         <div className="flex items-center gap-2 animate-in slide-in-from-top-1 -mt-1 mb-2">
-                             <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                                 <input type="checkbox" checked={loan.refinancePrevious || false} onChange={handleRefinanceToggle} className="w-3.5 h-3.5 rounded text-purple-600 focus:ring-purple-500 border-slate-300" />
-                                 <span className="text-[11px] font-bold text-purple-700">借新還舊（還清{loan.id === 2 ? '貸款A' : '前債'}）<span className="opacity-70 font-normal">{getRefinanceLabel()}</span></span>
-                             </label>
+                    {canRefinance && (
+                         <div className="flex flex-col gap-1 animate-in slide-in-from-top-1 -mt-1 mb-2">
+                             <div className="flex items-center gap-2">
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                    <input type="checkbox" checked={loan.refinancePrevious || false} onChange={handleRefinanceToggle} className="w-3.5 h-3.5 rounded text-purple-600 focus:ring-purple-500 border-slate-300" />
+                                    <span className="text-[11px] font-bold text-purple-700">
+                                        借新還舊 <span className="text-[10px] font-normal opacity-80">(還清 {loan.id===2 ? '貸款A' : (refinancableTargets.length > 0 ? refinancableTargets.join(' & ') : '前債')})</span>
+                                    </span>
+                                </label>
+                             </div>
+                             {loan.refinancePrevious && deficiencyMsg && (
+                                 <div className="text-[10px] text-orange-600 font-bold bg-orange-50 px-2 py-1 rounded flex items-center gap-1">
+                                     <Wallet2 size={10}/> {deficiencyMsg}
+                                 </div>
+                             )}
                          </div>
                     )}
 
@@ -630,7 +696,7 @@
                     colorClass = "text-orange-700";
                     bgClass = "bg-orange-50 border-orange-200 from-orange-50 to-white";
                     icon = Anchor;
-                    desc = "在悲觀情境 (P10) 下，您的資產將長期處於「負資產」狀態（市值 < 房貸餘額）。雖然不會被斷頭，但需要極強的心理素質撐過漫長的水下期。";
+                    desc = "在悲觀情境 (P10) 下，您的資產將長期處於「負資產」狀態（市值 <房貸餘額）。雖然不會被斷頭，但需要極強的心理素質撐過漫長的水下期。";
                 } else if (isWinRateGood && isSpreadAttractive) {
                     title = "聖杯區 (The Sweet Spot)";
                     colorClass = "text-emerald-700";
@@ -687,108 +753,78 @@
                             return { totalPayment, totalPrincipalRed };
                         });
 
-                        // Calculate Repayment at Maturity Schedule (Balloon Payments) & Identify Margin Loans
-                        const repaymentSchedule = new Float32Array(totalSteps + 1).fill(0);
-                        const marginRepaymentSchedule = new Float32Array(totalSteps + 1).fill(0); // Track Margin repayments specifically
+                        // 1. Prepare Loan Events (Sorted by Time)
+                        // This fixes the "Time Travel" issue by processing refinancing chronologically
+                        const loanEvents = loans
+                            .filter(l => l.amount > 0)
+                            .map(l => ({ ...l, startMonth: l.startYear * 12 }))
+                            .sort((a, b) => a.startMonth - b.startMonth);
 
-                        loans.forEach(loan => {
-                            if (loan.amount > 0 && loan.grace >= loan.years && loan.repayAtMaturity) {
-                                // FIX: Updated logic to check if refinanced
-                                // If loan is refinanced at a time T <= maturity time, then balloon payment is cancelled.
-                                let isRefinanced = false;
-                                const maturityTime = loan.startYear + loan.years;
-                                
-                                if (loan.id === 1) { // Loan A
-                                    // Refinanced by B or C?
-                                    if ((loans[1].refinancePrevious && loans[1].startYear <= maturityTime) || 
-                                        (loans[2].refinancePrevious && loans[2].startYear <= maturityTime)) {
-                                        isRefinanced = true;
-                                    }
-                                } else if (loan.id === 2) { // Loan B
-                                    // Refinanced by C?
-                                    if (loans[2].refinancePrevious && loans[2].startYear <= maturityTime) {
-                                        isRefinanced = true;
-                                    }
-                                }
+                        // Loan State Tracker (Alive or Dead?)
+                        const loanState = loans.map(l => ({ 
+                            id: l.id, 
+                            isPaidOff: false, 
+                            paidOffMonth: null 
+                        }));
 
-                                if (!isRefinanced) {
-                                    const maturityStep = (loan.startYear + loan.years) * 12;
-                                    if (maturityStep <= totalSteps) {
-                                        repaymentSchedule[maturityStep] += loan.amount;
-                                        if(loan.enableMargin) {
-                                            marginRepaymentSchedule[maturityStep] += loan.amount;
-                                        }
-                                    }
-                                }
-                            }
-                        });
-                        
-                        // New Logic: Loan Injection Schedule & Payoff Schedule
+                        // Pre-calculate Injection and Payoff Schedules based on Events
                         const injectionSchedule = new Float32Array(totalSteps + 1).fill(0);
                         const marginInjectionSchedule = new Float32Array(totalSteps + 1).fill(0);
-                        const payoffSchedule = new Float32Array(totalSteps + 1).fill(0); // For refinancing deductions
-                        const marginPayoffSchedule = new Float32Array(totalSteps + 1).fill(0); // Track margin reduction from refinance
+                        const payoffSchedule = new Float32Array(totalSteps + 1).fill(0); 
+                        const marginPayoffSchedule = new Float32Array(totalSteps + 1).fill(0); 
+                        const repaymentSchedule = new Float32Array(totalSteps + 1).fill(0);
+                        const marginRepaymentSchedule = new Float32Array(totalSteps + 1).fill(0);
 
-                        // Helper to get remaining balance of a loan at specific month
-                        const getBalanceAt = (loanIdx, monthIdx) => {
-                            const l = loans[loanIdx];
-                            if (l.amount <= 0) return 0;
-                            if (monthIdx < l.startYear * 12) return 0; // Not started
-                            const n_months_passed = monthIdx - (l.startYear * 12);
-                            if (n_months_passed < 0) return 0;
-                            if (n_months_passed > l.years * 12) return 0; // Finished normally
-                            
-                            // If grace period covers this point, balance = amount
-                            if (n_months_passed <= l.grace * 12) return l.amount;
-                            
-                            // Amortization formula for remaining balance
-                            const monthlyRate = l.rate / 100 / 12;
-                            const totalLoanMonths = l.years * 12;
-                            const amortizationMonths = totalLoanMonths - l.grace * 12;
-                            const monthsIntoAmortization = n_months_passed - l.grace * 12;
-                            
-                            if (monthlyRate === 0) {
-                                return l.amount * (1 - monthsIntoAmortization / amortizationMonths);
-                            }
-                            
-                            const numerator = Math.pow(1 + monthlyRate, amortizationMonths) - Math.pow(1 + monthlyRate, monthsIntoAmortization);
-                            const denominator = Math.pow(1 + monthlyRate, amortizationMonths) - 1;
-                            return l.amount * (numerator / denominator);
-                        };
+                        // Iterate through time to determine what happens
+                        // We must process loan starts and refinances in order
+                        
+                        // We need to simulate the "decision" at each loan start
+                        loanEvents.forEach(loan => {
+                            const t = loan.startMonth;
+                            if (t > totalSteps) return;
 
-                        loans.forEach(loan => {
-                            if (loan.amount > 0) {
-                                const startMonth = loan.startYear * 12;
-                                if (startMonth <= totalSteps) {
-                                    injectionSchedule[startMonth] += loan.amount;
-                                    if(loan.enableMargin) {
-                                        marginInjectionSchedule[startMonth] += loan.amount;
+                            // 1. Inject New Loan
+                            injectionSchedule[t] += loan.amount;
+                            if (loan.enableMargin) marginInjectionSchedule[t] += loan.amount;
+
+                            // 2. Check Refinance Logic
+                            if (loan.refinancePrevious) {
+                                // Find targets that started BEFORE this loan
+                                const targets = loans.filter(l => l.id < loan.id && l.amount > 0 && l.startYear < loan.startYear);
+                                
+                                targets.forEach(target => {
+                                    // Check if target is already paid off
+                                    const targetState = loanState.find(s => s.id === target.id);
+                                    if (!targetState.isPaidOff) {
+                                        // Calculate balance at time t
+                                        const balance = getEstimatedBalance(target, t);
+                                        if (balance > 0) {
+                                            payoffSchedule[t] += balance;
+                                            if (target.enableMargin) marginPayoffSchedule[t] += balance;
+                                            
+                                            // Mark as paid off
+                                            targetState.isPaidOff = true;
+                                            targetState.paidOffMonth = t;
+                                        }
                                     }
-                                    
-                                    // Handle Refinance Deductions HERE
-                                    if (loan.refinancePrevious) {
-                                        if (loan.id === 2) { // B refinances A
-                                            const balanceA = getBalanceAt(0, startMonth);
-                                            payoffSchedule[startMonth] += balanceA;
-                                            if (loans[0].enableMargin) marginPayoffSchedule[startMonth] += balanceA;
-                                        }
-                                        if (loan.id === 3) { // C refinances A & B
-                                            // Check A
-                                            if (loans[0].startYear < loan.startYear) {
-                                                 const bRefinancedA = loans[1].refinancePrevious && loans[1].startYear < loan.startYear && loans[1].startYear > loans[0].startYear;
-                                                 if (!bRefinancedA) {
-                                                     const balanceA = getBalanceAt(0, startMonth);
-                                                     payoffSchedule[startMonth] += balanceA;
-                                                     if (loans[0].enableMargin) marginPayoffSchedule[startMonth] += balanceA;
-                                                 }
-                                            }
-                                            // Check B
-                                            if (loans[1].startYear < loan.startYear) {
-                                                const balanceB = getBalanceAt(1, startMonth);
-                                                payoffSchedule[startMonth] += balanceB;
-                                                if (loans[1].enableMargin) marginPayoffSchedule[startMonth] += balanceB;
-                                            }
-                                        }
+                                });
+                            }
+                        });
+
+                        // 3. Balloon Payments (Maturity)
+                        // Must respect the loanState (if already paid off by refi, no balloon)
+                        loans.forEach(loan => {
+                            if (loan.amount > 0 && loan.grace >= loan.years && loan.repayAtMaturity) {
+                                const maturityStep = (loan.startYear + loan.years) * 12;
+                                if (maturityStep <= totalSteps) {
+                                    // Check if alive
+                                    const state = loanState.find(s => s.id === loan.id);
+                                    if (!state.isPaidOff) {
+                                        // It survived until maturity, so pay it off now
+                                        repaymentSchedule[maturityStep] += loan.amount;
+                                        if (loan.enableMargin) marginRepaymentSchedule[maturityStep] += loan.amount;
+                                        // Mark dead (though simulation might end here for this loan)
+                                        state.isPaidOff = true; 
                                     }
                                 }
                             }
@@ -941,16 +977,14 @@
                                         for (const loan of loans) {
                                             const loanStartMonth = (loan.startYear || 0) * 12;
                                             const isLoanActive = (t + 1) > loanStartMonth; 
-                                            // Fix: Also check if loan is NOT paid off by refinance?
-                                            // Simplified: if enableMargin is true and we have margin debt, apply logic.
-                                            // The maintenance margin is tied to specific loan terms, usually the highest one applies or per loan.
-                                            // For simplicity, if any active margin loan's threshold is breached, call it.
-                                            
-                                            let isRefinancedGone = false;
-                                            if(loan.id === 1 && ((loans[1].refinancePrevious && (t+1) >= loans[1].startYear*12) || (loans[2].refinancePrevious && (t+1) >= loans[2].startYear*12))) isRefinancedGone = true;
-                                            if(loan.id === 2 && (loans[2].refinancePrevious && (t+1) >= loans[2].startYear*12)) isRefinancedGone = true;
+                                            // Logic Check: Is loan active AND not paid off?
+                                            // The `loanState` pre-calculation handles static payoff logic.
+                                            // Dynamic checking here is tricky if we don't carry state.
+                                            // Simplification: We check if `t+1` is < paidOffMonth.
+                                            const lState = loanState.find(s => s.id === loan.id);
+                                            const isPaidOff = lState.isPaidOff && (t+1) >= lState.paidOffMonth;
 
-                                            if (loan.amount > 0 && loan.enableMargin && isLoanActive && !isRefinancedGone && currentRatio < loan.maintenanceMargin) {
+                                            if (loan.amount > 0 && loan.enableMargin && isLoanActive && !isPaidOff && currentRatio < loan.maintenanceMargin) {
                                                 hasGoneBust = true;
                                                 currentGrossAsset = 0; 
                                                 break;
@@ -1257,9 +1291,9 @@
                     <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
                         <div className="p-2 bg-indigo-600 rounded-lg text-white shadow-md"> <Activity size={24} /> </div>
-                        增貸投資壓力測試模擬器 v2.23
+                        增貸投資壓力測試模擬器 v2.26
                     </h1>
-                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">智能防呆版 (Smart UI)</span> </p>
+                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">時序邏輯重構版 (Time-Sorted Logic)</span> </p>
                     </div>
                 </div>
 
@@ -1797,7 +1831,7 @@
                         <div>
                             <h4 className="text-sm font-bold text-amber-900 mb-2">模型限制與校正提醒 (Model Disclaimers)</h4>
                             <ul className="text-xs text-amber-800 space-y-1.5 list-disc list-inside opacity-90">
-                                <li><strong>v2.23 智能防呆 (Smart UI)</strong>：本模型新增了「借新還舊」的智能顯示邏輯。只有當新貸款的投入時間「等於或晚於」前一筆貸款的開始時間，且能形成有效的轉貸關係時，選項才會出現，避免設定邏輯錯誤。</li>
+                                <li><strong>v2.26 時序邏輯重構 (Time-Sorted Logic)</strong>：本模型採用事件驅動的時序邏輯，能完美處理「信貸接龍」與「借新還舊」的複雜情境。無論您的貸款設定為何種順序，系統都會依據時間軸自動計算最正確的償還路徑。</li>
                                 <li><strong>混合情境</strong>：支援同時模擬「房貸（不斷頭）」、「融資（會斷頭）」與「到期一次還本」的複雜債務組合。</li>
                                 <li><strong>流動性是唯一死穴 (Liquidity is King)</strong>：對於未啟用維持率限制的貸款（如房貸），唯一會導致破產的原因是「繳不出貸款」。請務必關注左側的「現金流警示」儀表板。</li>
                                 <li><strong>負資產心理壓力</strong>：雖然房貸模式允許淨值為負（水下），但現實中看著資產負債表赤字需要極強的心理素質，請勿忽視心理帳戶的影響。</li>
