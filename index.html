@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>增貸投資壓力測試模擬器 v2.60 - 介面佈局優化版</title>
+    <title>增貸投資壓力測試模擬器 v2.61 - 視覺與邏輯精修版</title>
     
     <!-- 1. 載入 Tailwind CSS (樣式) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -474,9 +474,9 @@
                                                 <span className="font-medium text-slate-600">{displayName}</span>
                                             </div>
                                             <span className="font-mono font-bold" style={{ color: valueColor }}>
-                                                {/* FIX v2.51: Show 1 decimal place with defensive check */}
+                                                {/* FIX v2.51: Show 1 decimal place */}
                                                 {(entry.name === 'monthlyInjection' || (entry.name === 'netCashFlow' && value > 0)) ? '+' : ''}
-                                                {(value || 0).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 萬
+                                                {value.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 萬
                                             </span>
                                         </div>
                                     );
@@ -508,7 +508,7 @@
                                                 <span className="font-medium text-slate-600">{displayName}</span>
                                             </div>
                                             <span className="font-mono font-bold" style={{ color: valueColor }}>
-                                                {(value || 0).toFixed(1)}%
+                                                {value.toFixed(1)}%
                                             </span>
                                         </div>
                                      );
@@ -629,6 +629,7 @@
         };
 
         const versionHistory = [
+            { ver: "v2.61", title: "視覺與邏輯精修 (Visual Tweak)", desc: "優化槓桿圖縱軸刻度為0.5單位，修正生存率圖副標題顏色一致性，並強制回檔圖對照組邏輯為同一平行宇宙。" },
             { ver: "v2.60", title: "介面佈局優化 (Layout Tweak)", desc: "修正圖表標題區塊的 Flexbox 佈局，防止過長的說明文字擠壓右側的圖表切換按鈕，確保在各種螢幕寬度下都能保持良好的閱讀體驗。" },
             { ver: "v2.59", title: "風險視覺優化 (Visual Tweak)", desc: "統一風險指標表格的配色邏輯，針對波動率與回檔超過無貸50%的情況以紅字警示。並將回檔圖 Y 軸下限鎖定為 P10 MDD，避免極端值干擾判讀。" },
             { ver: "v2.58", title: "邏輯一致性終極版 (Consistency Ultimate)", desc: "修復了 v2.57 中標題版本號未更新的問題。針對風險評估邏輯進行了全面掃描與壓力測試，確認「借新還舊」、「P50 路徑鎖定」與「評論區警示」皆已達到穩定標準。" },
@@ -1025,19 +1026,17 @@
                         const marginInjectionSchedule = new Float32Array(totalSteps + 1).fill(0);
                         const payoffSchedule = new Float32Array(totalSteps + 1).fill(0); 
                         const marginPayoffSchedule = new Float32Array(totalSteps + 1).fill(0); 
-                        
-                        // FIX v2.44: Track Net Capital Flow for Cash Flow Chart
-                        const netCapitalFlowSchedule = new Float32Array(totalSteps + 1).fill(0);
 
+                        // Iterate through time to determine what happens
                         loanEvents.forEach(loan => {
                             const t = loan.startMonth;
                             if (t > totalSteps) return;
 
+                            // 1. Inject New Loan
                             injectionSchedule[t] += loan.amount;
                             if (loan.enableMargin) marginInjectionSchedule[t] += loan.amount;
-                            
-                            netCapitalFlowSchedule[t] += loan.amount; 
 
+                            // 2. Check Refinance Logic
                             if (loan.refinancePrevious) {
                                 const targets = loans.filter(l => l.id < loan.id && l.amount > 0 && l.startYear < loan.startYear);
                                 targets.forEach(target => {
@@ -1048,8 +1047,6 @@
                                          if (balance > 0) {
                                             payoffSchedule[t] += balance;
                                             if (target.enableMargin) marginPayoffSchedule[t] += balance;
-                                            
-                                            netCapitalFlowSchedule[t] -= balance;
                                          }
                                     }
                                 });
@@ -1472,7 +1469,7 @@
                                 p50Base = medianBaseUniverse ? medianBaseUniverse.pathBaseNW[t] : 0;
                             } else if (type === 'DRAWDOWN') { // NEW CHART TYPE
                                 p50Lev = medianLevUniverse ? medianLevUniverse.pathLevDD[t] : 0;
-                                p50Base = medianBaseUniverse ? medianBaseUniverse.pathBaseDD[t] : 0;
+                                p50Base = medianLevUniverse ? medianLevUniverse.pathBaseDD[t] : 0; // FIX v2.61: Use SAME universe for comparison
                             } else {
                                 const levNW = medianLevUniverse ? medianLevUniverse.pathLevNW[t] : 0;
                                 const levGA = medianLevUniverse ? medianLevUniverse.pathLevGA[t] : 0;
@@ -1538,8 +1535,10 @@
             let yAxisDomain;
             if (viewMode === 'leverage') {
                 yAxisDomain = [1, (dataMax) => {
+                     // FIX v2.61: Nicer Y-axis for Leverage
                      if (!isFinite(dataMax)) return 5;
-                     return Math.min(dataMax * 1.1, 5); 
+                     const niceMax = Math.ceil(dataMax * 1.1 * 2) / 2;
+                     return Math.min(niceMax, 5); 
                 }];
             } else if (viewMode === 'netWorth' && stats.levROI.p90NetWorth) {
                 const maxP90 = Math.max(stats.levROI.p90NetWorth, stats.baseROI.p90NetWorth || 0);
@@ -1637,9 +1636,9 @@
                     <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
                         <div className="p-2 bg-indigo-600 rounded-lg text-white shadow-md"> <Activity size={24} /> </div>
-                        增貸投資壓力測試模擬器 v2.60
+                        增貸投資壓力測試模擬器 v2.61
                     </h1>
-                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">介面佈局優化版 (Layout Tweak)</span> </p>
+                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">視覺與邏輯精修版 (Visual Tweak)</span> </p>
                     </div>
                 </div>
 
@@ -1734,7 +1733,15 @@
 
                             <div className="border-t border-slate-200">
                                 <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex justify-between items-center">
-                                    <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2"> <BarChart2 className="w-4 h-4 text-indigo-600" /> {years} 年後 總報酬率與風險分析 (Total Return & Risk) </h4>
+                                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                        <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2"> 
+                                            <BarChart2 className="w-4 h-4 text-indigo-600" /> 
+                                            {years} 年後 總報酬率與風險分析 (Total Return & Risk) 
+                                        </h4>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                         {/* Placeholder for future controls */}
+                                    </div>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm text-left">
@@ -1822,19 +1829,19 @@
                     </div>
 
                     <div className="bg-white rounded-2xl shadow-md border border-slate-200 p-6 mt-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <div>
+                        <div className="flex justify-between items-start gap-4 mb-6">
+                            <div className="flex-1 min-w-0">
                                 <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"> 
                                     {selectedUniverseIndex === -1 ? `資產淨值模擬 (Net Worth)` : `單一平行宇宙檢視`}
                                 </h2>
                                 
-                                {selectedUniverseId === null && viewMode === 'survival' && <p className="text-xs text-red-500 mt-1 font-bold">檢視策略的死亡風險：曲線越陡峭，代表破產歸零的機率越高</p>}
+                                {selectedUniverseId === null && viewMode === 'survival' && <p className="text-xs text-slate-400 mt-1 font-medium">檢視策略的死亡風險：曲線越陡峭，代表破產歸零的機率越高</p>}
                                 {selectedUniverseId === null && viewMode !== 'targetProb' && viewMode !== 'survival' && viewMode !== 'cashFlow' && viewMode !== 'drawdown' && <p className="text-xs text-slate-400 mt-1 font-medium">隨機呈現 50 條市場路徑，展示真實的波動風險 (暖色=有貸, 冷色=無貸)</p>}
                                 {viewMode === 'targetProb' && <p className="text-xs text-slate-400 mt-1 font-medium">顯示有多少比例的平行宇宙在特定時間點前已達成 {targetAmount} 萬目標</p>}
                                 {viewMode === 'cashFlow' && <p className="text-xs text-slate-400 mt-1 font-medium">分析每個月的資金流入(儲蓄)與流出(還款)，正值為安全區間，負值需變賣資產</p>}
                                 {viewMode === 'drawdown' && <p className="text-xs text-slate-400 mt-1 font-medium">顯示資產從歷史高點下跌的百分比。曲線越深，代表承受的心理壓力越大。</p>}
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 shrink-0 pt-1">
                                 {selectedUniverseId === null ? (
                                     <div className="bg-slate-100 p-1 rounded-lg flex text-xs font-bold shadow-inner">
                                         <button onClick={() => setViewMode('netWorth')} className={`px-3 py-2 rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'netWorth' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700'}`}> <Eye size={14} /> 淨值 </button>
@@ -1885,9 +1892,9 @@
                                         tickFormatter={(val) => {
                                             if (viewMode === 'targetProb' || viewMode === 'survival') return `${val}%`;
                                             if (viewMode === 'leverage') return `${val}x`;
-                                            if (viewMode === 'drawdown') return `${(val || 0).toFixed(0)}%`;
+                                            if (viewMode === 'drawdown') return `${val.toFixed(0)}%`;
                                             if (viewMode === 'cashFlow') return (val || 0).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-                                            return val > 10000 || val < -10000 ? ((val || 0)/10000).toFixed(1)+'億' : (val || 0).toLocaleString();
+                                            return val > 10000 || val < -10000 ? (val/10000).toFixed(1)+'億' : val.toLocaleString();
                                         }} 
                                         label={{ value: viewMode === 'netWorth' ? '淨值 (萬)' : (viewMode === 'survival' ? '生存機率 (%)' : (viewMode === 'leverage' ? '槓桿倍數 (x)' : (viewMode === 'cashFlow' ? '金額 (萬)' : (viewMode === 'drawdown' ? '回檔幅度 (%)' : '達標機率 (%)')))), angle: -90, position: 'insideLeft', offset: -5, style: { textAnchor: 'middle', fontSize: 11, fill: '#64748b' } }} 
                                         tickLine={false} 
@@ -2125,7 +2132,7 @@
                             <h4 className="text-sm font-bold text-amber-900 mb-2">模型限制與校正提醒 (Model Disclaimers)</h4>
                             
                             <ul className="text-xs text-amber-800 space-y-1.5 list-disc list-inside opacity-90">
-                                <li><strong>v2.60 介面佈局優化 (Layout Tweak)</strong>：修正圖表標題區塊的 Flexbox 佈局，防止過長的說明文字擠壓右側的圖表切換按鈕，確保在各種螢幕寬度下都能保持良好的閱讀體驗。</li>
+                                <li><strong>v2.61 視覺與邏輯精修 (Visual Tweak)</strong>：優化槓桿圖縱軸刻度為0.5單位，修正生存率圖副標題顏色一致性，並強制回檔圖對照組邏輯為同一平行宇宙。</li>
                                 <li><strong>混合情境 (Hybrid Complexity)</strong>：支援同時模擬「房貸（不斷頭）」、「融資（會斷頭）」與「到期一次還本」的複雜債務組合。</li>
                                 <li><strong>流動性是唯一死穴 (Liquidity is King)</strong>：對於未啟用維持率限制的貸款（如房貸），唯一會導致破產的原因是「繳不出貸款」。請務必關注左側的「現金流警示」儀表板。</li>
                                 <li><strong>負資產心理壓力 (Psychological Pressure)</strong>：雖然房貸模式允許淨值為負（水下），但現實中看著資產負債表赤字需要極強的心理素質，請勿忽視心理帳戶的影響。</li>
