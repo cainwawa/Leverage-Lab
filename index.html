@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>增貸投資壓力測試模擬器 v2.63 - 路徑一致性修正版</title>
+    <title>增貸投資壓力測試模擬器 v2.64 - 視覺刻度優化版</title>
     
     <!-- 1. 載入 Tailwind CSS (樣式) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -53,7 +53,7 @@
         import React, { useState, useEffect, useMemo, memo, useCallback } from 'react';
         import { createRoot } from 'react-dom/client';
         import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart, Legend, BarChart, Bar, Cell, ReferenceDot, Label } from 'recharts';
-        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink, CalendarClock, Hourglass, ArrowLeftRight, CheckCircle2, Wallet2, Maximize2, ChevronDown, ChevronUp, History, Bird, Banknote, AreaChart } from 'lucide-react';
+        import { AlertTriangle, TrendingUp, DollarSign, Activity, Info, RefreshCw, Wallet, Settings, Landmark, Plus, Minus, CheckSquare, ArrowRight, Eye, Layers, AlertOctagon, TrendingDown, Cpu, ThumbsUp, ThumbsDown, HelpCircle, BarChart2, ShieldAlert, Scale, Zap, BookOpen, Search, X, Skull, Hash, ShieldCheck, Target, Flag, Clock, Timer, Sigma, HeartPulse, Anchor, Loader2, Bomb, RotateCcw, Siren, Lock, ExternalLink, CalendarClock, Hourglass, ArrowLeftRight, CheckCircle2, Wallet2, Maximize2, ChevronDown, ChevronUp, History, Bird, Banknote } from 'lucide-react';
 
         // --- 數學核心函式庫 ---
 
@@ -232,7 +232,10 @@
             const canRefinanceA = loan.id === 2 && allLoans[0].startYear < loan.startYear;
             const canRefinancePrev = loan.id === 3 && loan.startYear >= allLoans[1].startYear; // C >= B
 
+            // Check if all start times are the same
             const isAllSameStart = allLoans[0].startYear === allLoans[1].startYear && allLoans[1].startYear === allLoans[2].startYear;
+
+            // Update Visibility Logic: Hide if all same start time
             const canRefinance = !isAllSameStart && ((loan.id === 2 && canRefinanceA) || (loan.id === 3 && canRefinancePrev));
 
             const getRefinanceLabel = () => {
@@ -625,6 +628,7 @@
         };
 
         const versionHistory = [
+            { ver: "v2.64", title: "視覺刻度優化 (Visual Scale Fix)", desc: "針對「回檔圖」縱軸進行智慧限縮，將最小值鎖定在 P10 悲觀回檔附近，避免單一極端路徑壓縮整體圖形，提升閱讀辨識度。" },
             { ver: "v2.63", title: "路徑一致性修正 (Consistency Fix)", desc: "修正圖表邏輯，強制「有貸」與「無貸」的 P50 線對應同一個平行宇宙（以有貸中位數為準），確保回檔比較基準一致。風險表格則維持獨立統計。" },
             { ver: "v2.62", title: "正式發布版 (Gold Master)", desc: "全方位邏輯校正完成。引入「價值毀滅」與「劇烈震盪」風險判定，優化 UI 佈局與現金流圖表，確保模擬結果精準且具參考價值。" },
             { ver: "v2.61", title: "視覺與邏輯精修 (Visual Tweak)", desc: "優化槓桿圖縱軸刻度為0.5單位，修正生存率圖副標題顏色一致性，並強制回檔圖對照組邏輯為同一平行宇宙。" },
@@ -1565,6 +1569,14 @@
                 ];
             } else if (viewMode === 'targetProb' || viewMode === 'survival') {
                 yAxisDomain = [0, 100];
+            } else if (viewMode === 'drawdown') {
+                // FIX v2.64: Smart Y-Axis for Drawdown
+                // Limit the lower bound to around P10 MDD to avoid outliers compressing the chart
+                // Find the worst P10 MDD between Lev and Base
+                const worstP10 = Math.min(stats.levROI.mdd, stats.baseROI.mdd);
+                // Add padding (e.g. 1.2x) but cap at -100
+                const lowerBound = Math.max(-100, worstP10 * 1.2);
+                yAxisDomain = [lowerBound, 0];
             } else {
                 yAxisDomain = ['auto', 'auto'];
             }
@@ -1649,9 +1661,9 @@
                     <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
                         <div className="p-2 bg-indigo-600 rounded-lg text-white shadow-md"> <Activity size={24} /> </div>
-                        增貸投資壓力測試模擬器 v2.63
+                        增貸投資壓力測試模擬器 v2.64
                     </h1>
-                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">路徑一致性修正版 (Consistency Fix)</span> </p>
+                    <p className="text-slate-500 mt-2 text-sm md:text-base font-medium"> 房貸型投資韌性分析: <span className="text-indigo-600 font-bold">視覺刻度優化版 (Visual Scale Fix)</span> </p>
                     </div>
                 </div>
 
@@ -2145,9 +2157,7 @@
                             <h4 className="text-sm font-bold text-amber-900 mb-2">模型限制與校正提醒 (Model Disclaimers)</h4>
                             
                             <ul className="text-xs text-amber-800 space-y-1.5 list-disc list-inside opacity-90">
-                                <li><strong>v2.63 路徑一致性修正 (Consistency Fix)</strong>：修正圖表邏輯，強制「有貸」與「無貸」的 P50 線對應同一個平行宇宙（以有貸中位數為準），確保回檔比較基準一致。風險表格則維持獨立統計。</li>
-                                <li><strong>v2.62 正式發布版 (Gold Master)</strong>：全方位邏輯校正完成。引入「價值毀滅」與「劇烈震盪」風險判定，優化 UI 佈局與現金流圖表，確保模擬結果精準且具參考價值。</li>
-                                <li><strong>v2.61 視覺與邏輯精修 (Visual Tweak)</strong>：優化槓桿圖縱軸刻度為0.5單位，修正生存率圖副標題顏色一致性，並強制回檔圖對照組邏輯為同一平行宇宙。</li>
+                                <li><strong>v2.64 視覺刻度優化 (Visual Scale Fix)</strong>：針對「回檔圖」縱軸進行智慧限縮，將最小值鎖定在 P10 悲觀回檔附近，避免單一極端路徑壓縮整體圖形，提升閱讀辨識度。</li>
                                 <li><strong>混合情境 (Hybrid Complexity)</strong>：支援同時模擬「房貸（不斷頭）」、「融資（會斷頭）」與「到期一次還本」的複雜債務組合。</li>
                                 <li><strong>流動性是唯一死穴 (Liquidity is King)</strong>：對於未啟用維持率限制的貸款（如房貸），唯一會導致破產的原因是「繳不出貸款」。請務必關注左側的「現金流警示」儀表板。</li>
                                 <li><strong>負資產心理壓力 (Psychological Pressure)</strong>：雖然房貸模式允許淨值為負（水下），但現實中看著資產負債表赤字需要極強的心理素質，請勿忽視心理帳戶的影響。</li>
